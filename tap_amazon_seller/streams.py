@@ -87,7 +87,7 @@ class OrdersStream(AmazonSellerStream):
         credentials = dict(
             refresh_token=self.config.get('refresh_token'),
             lwa_app_id=self.config.get('client_id'),
-            lwa_client_secret=self.config.get('lwa_client_secret'),
+            lwa_client_secret=self.config.get('client_secret'),
             aws_access_key=self.config.get('aws_access_key'),
             aws_secret_key=self.config.get('aws_secret_key'),
             role_arn=self.config.get('role_arn'),
