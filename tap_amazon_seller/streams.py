@@ -21,6 +21,16 @@ SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 
 
 class OrdersStream(AmazonSellerStream):
+    def get_credentials(self):
+        return dict(
+            refresh_token=self.config.get('refresh_token'),
+            lwa_app_id=self.config.get('lwa_app_id'),
+            lwa_client_secret=self.config.get('lwa_client_secret'),
+            aws_access_key=self.config.get('aws_access_key'),
+            aws_secret_key=self.config.get('aws_secret_key'),
+            role_arn=self.config.get('role_arn'),
+        )
+        
     """Define custom stream."""
     name = "orders"
     primary_keys = ["AmazonOrderId"]
@@ -84,14 +94,7 @@ class OrdersStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        credentials = dict(
-            refresh_token=self.config.get('refresh_token'),
-            lwa_app_id=self.config.get('lwa_client_id'),
-            lwa_client_secret=self.config.get('client_secret'),
-            aws_access_key=self.config.get('aws_access_key'),
-            aws_secret_key=self.config.get('aws_secret_key'),
-            role_arn=self.config.get('role_arn'),
-        )
+        credentials = self.get_credentials()
         #Return test orders only for now. Change the CreatedAfter to replication key before final version
         #and remove marketplaceids for picking up assosiated account's defualt marketplace
         return Orders(credentials=credentials).get_orders(CreatedAfter='TEST_CASE_200',MarketplaceIds=['ATVPDKIKX0DER'])
@@ -100,3 +103,52 @@ class OrdersStream(AmazonSellerStream):
         for page in self.load_all_orders():
             for order in page.payload.get('Orders'):
                 yield order
+
+class OrderItemsStream(AmazonSellerStream):
+    def get_credentials(self):
+        return dict(
+            refresh_token=self.config.get('refresh_token'),
+            lwa_app_id=self.config.get('lwa_app_id'),
+            lwa_client_secret=self.config.get('lwa_client_secret'),
+            aws_access_key=self.config.get('aws_access_key'),
+            aws_secret_key=self.config.get('aws_secret_key'),
+            role_arn=self.config.get('role_arn'),
+        )
+    """Define custom stream."""
+    name = "orderitems"
+    primary_keys = ["OrderItemId"]
+    replication_key = None
+    # Optionally, you may also use `schema_filepath` in place of `schema`:
+    # schema_filepath = SCHEMAS_DIR / "users.json"
+    schema = th.PropertiesList(
+        th.Property('AmazonOrderId',th.StringType),
+        th.Property('OrderItems',th.ArrayType(
+            th.ObjectType(
+                th.Property("ASIN", th.StringType),
+                th.Property("OrderItemId", th.StringType),
+                th.Property("SellerSKU", th.StringType),
+                th.Property("Title", th.StringType),
+                th.Property("QuantityOrdered", th.NumberType),
+                th.Property("QuantityShipped", th.NumberType),
+                th.Property("ProductInfo", th.CustomType({"type": ["object", "string"]})),
+                th.Property("ItemPrice", th.CustomType({"type": ["object", "string"]})),
+                th.Property("ItemTax", th.CustomType({"type": ["object", "string"]})),
+                th.Property("PromotionDiscount", th.CustomType({"type": ["object", "string"]})),
+                th.Property("IsGift", th.BooleanType),
+                th.Property("ConditionId", th.StringType),
+                th.Property("ConditionSubtypeId", th.StringType),
+                th.Property("IsTransparency", th.BooleanType),
+                th.Property("SerialNumberRequired", th.BooleanType),
+                th.Property("IossNumber", th.StringType),
+                th.Property("DeemedResellerCategory", th.StringType),
+                th.Property("StoreChainStoreId", th.StringType),
+                th.Property("BuyerRequestedCancel", th.CustomType({"type": ["object", "string"]})),
+            )
+        ))
+        
+    ).to_dict()
+
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        credentials = self.get_credentials()
+        items =   Orders(credentials=credentials).get_order_items("TEST_CASE_200").payload
+        return [items]    
