@@ -25,7 +25,7 @@ class TapAmazonSeller(Tap):
 
     # TODO: Update this section with the actual config values you expect:
     config_jsonschema = th.PropertiesList(
-        th.Property( "lwa_app_id",th.StringType,required=True),
+        th.Property( "client_id",th.StringType,required=True),
         th.Property( "lwa_client_secret",th.StringType,required=True),
         th.Property( "aws_access_key",th.StringType,required=True),
         th.Property( "aws_secret_key",th.StringType,required=True),
