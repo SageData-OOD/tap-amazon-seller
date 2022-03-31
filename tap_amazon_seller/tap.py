@@ -31,6 +31,7 @@ class TapAmazonSeller(Tap):
         th.Property( "aws_secret_key",th.StringType,required=True),
         th.Property( "role_arn",th.StringType,required=True),
         th.Property( "refresh_token",th.StringType,required=True),
+        th.Property( "marketplace",th.StringType),
     ).to_dict()
 
     def discover_streams(self) -> List[Stream]:

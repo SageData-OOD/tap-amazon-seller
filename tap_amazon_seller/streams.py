@@ -10,7 +10,7 @@ from tap_amazon_seller.client import AmazonSellerStream
 from sp_api.api import Orders
 from sp_api.base import SellingApiException
 from datetime import datetime, timedelta
-from sp_api.base import Marketplaces
+
 from datetime import date
 from sp_api.util import throttle_retry, load_all_pages
 
@@ -21,15 +21,7 @@ SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 
 
 class OrdersStream(AmazonSellerStream):
-    def get_credentials(self):
-        return dict(
-            refresh_token=self.config.get('refresh_token'),
-            lwa_app_id=self.config.get('lwa_app_id'),
-            lwa_client_secret=self.config.get('lwa_client_secret'),
-            aws_access_key=self.config.get('aws_access_key'),
-            aws_secret_key=self.config.get('aws_secret_key'),
-            role_arn=self.config.get('role_arn'),
-        )
+    
         
     """Define custom stream."""
     name = "orders"
@@ -89,35 +81,41 @@ class OrdersStream(AmazonSellerStream):
     ).to_dict()
     @throttle_retry()
     @load_all_pages()
-    def load_all_orders(self):
+    def load_all_orders(self,context):
     
         """
         a generator function to return all pages, obtained by NextToken
         """
-        credentials = self.get_credentials()
+        orders = self.get_sp_orders()
         #Return test orders only for now. Change the CreatedAfter to replication key before final version
         #and remove marketplaceids for picking up assosiated account's defualt marketplace
-        return Orders(credentials=credentials).get_orders(CreatedAfter='TEST_CASE_200',MarketplaceIds=['ATVPDKIKX0DER'])
+        start_date = self.get_starting_timestamp(context)
+        if start_date is None:
+            #Get all orders
+            start_date = '1970-01-01'
+        else:
+            start_date = start_date.strftime("%Y-%m-%d")
+
+        return orders.get_orders(CreatedAfter=start_date)
 
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        for page in self.load_all_orders():
+        for page in self.load_all_orders(context):
             for order in page.payload.get('Orders'):
                 yield order
 
+    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
+        """Return a context dictionary for child streams."""
+        return {
+            "AmazonOrderId": record["AmazonOrderId"],
+        }            
+
 class OrderItemsStream(AmazonSellerStream):
-    def get_credentials(self):
-        return dict(
-            refresh_token=self.config.get('refresh_token'),
-            lwa_app_id=self.config.get('lwa_app_id'),
-            lwa_client_secret=self.config.get('lwa_client_secret'),
-            aws_access_key=self.config.get('aws_access_key'),
-            aws_secret_key=self.config.get('aws_secret_key'),
-            role_arn=self.config.get('role_arn'),
-        )
     """Define custom stream."""
     name = "orderitems"
     primary_keys = ["OrderItemId"]
     replication_key = None
+    order_id = "{AmazonOrderId}"
+    parent_stream_type = OrdersStream
     # Optionally, you may also use `schema_filepath` in place of `schema`:
     # schema_filepath = SCHEMAS_DIR / "users.json"
     schema = th.PropertiesList(
@@ -134,7 +132,7 @@ class OrderItemsStream(AmazonSellerStream):
                 th.Property("ItemPrice", th.CustomType({"type": ["object", "string"]})),
                 th.Property("ItemTax", th.CustomType({"type": ["object", "string"]})),
                 th.Property("PromotionDiscount", th.CustomType({"type": ["object", "string"]})),
-                th.Property("IsGift", th.BooleanType),
+                th.Property("IsGift", th.StringType),
                 th.Property("ConditionId", th.StringType),
                 th.Property("ConditionSubtypeId", th.StringType),
                 th.Property("IsTransparency", th.BooleanType),
@@ -149,6 +147,11 @@ class OrderItemsStream(AmazonSellerStream):
     ).to_dict()
 
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        credentials = self.get_credentials()
-        items =   Orders(credentials=credentials).get_order_items("TEST_CASE_200").payload
+        orders = self.get_sp_orders()
+        if 'AmazonOrderId' in self.partitions[0]:
+            order_id = self.partitions[0]['AmazonOrderId'] 
+        else:
+            return []        
+
+        items =   orders.get_order_items(order_id=order_id).payload
         return [items]    
