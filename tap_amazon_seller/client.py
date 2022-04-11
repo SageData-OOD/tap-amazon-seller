@@ -36,6 +36,6 @@ class AmazonSellerStream(Stream):
         )
     def get_sp_orders(self,marketplace_id=None):
         if marketplace_id is None:
-                marketplace_id = self.config.get('marketplace','US')
+            marketplace_id = self.config.get('marketplace','US')
 
         return Orders(credentials=self.get_credentials(),marketplace = Marketplaces[marketplace_id])        
