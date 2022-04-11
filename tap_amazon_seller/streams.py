@@ -20,14 +20,42 @@ SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 #       - Copy-paste as many times as needed to create multiple stream types.
 
 
-class OrdersStream(AmazonSellerStream):
-    
-        
+class MarketplacesStream(AmazonSellerStream):
+    """Define custom stream."""
+    name = "marketplaces"
+    primary_keys = ["id"]
+    replication_key = None
+    # Optionally, you may also use `schema_filepath` in place of `schema`:
+    # schema_filepath = SCHEMAS_DIR / "users.json"
+    schema = th.PropertiesList(
+        th.Property('id',th.StringType),
+        th.Property('name',th.StringType),
+    ).to_dict()
+    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
+        """Return a context dictionary for child streams."""
+        return {
+            "marketplace_id": record["id"],
+        }        
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        marketplaces = ["US", "CA", "MX", "BR", "ES", "GB", "FR", "NL", "DE", "IT", "SE", "PL", "EG", "TR", "SA", "AE", "IN", "SG", "AU", "JP"]
+        orders = self.get_sp_orders()
+        #Fetch minimum number of orders and verify credentials are working
+        today_date = datetime.today().strftime('%Y-%m-%d')
+        for mp in marketplaces:
+            try:
+                orders = self.get_sp_orders(mp)
+                allorders = orders.get_orders(CreatedAfter=today_date)
+                yield {"id":mp}
+            except:
+                output = f"marketplace {mp} not part of current SP account"
+class OrdersStream(AmazonSellerStream):      
     """Define custom stream."""
     name = "orders"
     primary_keys = ["AmazonOrderId"]
     replication_key = "LastUpdateDate"
     records_jsonpath = "$.Orders[*]"
+    parent_stream_type = MarketplacesStream
+    marketplace_id = "{marketplace_id}"
     # Optionally, you may also use `schema_filepath` in place of `schema`:
     # schema_filepath = SCHEMAS_DIR / "users.json"
     schema = th.PropertiesList(
@@ -86,7 +114,12 @@ class OrdersStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        orders = self.get_sp_orders()
+        mp = None
+        if 'marketplace_id' in self.partitions[0]:
+            mp = self.partitions[0]['marketplace_id'] 
+        
+
+        orders = self.get_sp_orders(mp)
         #Return test orders only for now. Change the CreatedAfter to replication key before final version
         #and remove marketplaceids for picking up assosiated account's defualt marketplace
         start_date = self.get_starting_timestamp(context)
@@ -105,8 +138,12 @@ class OrdersStream(AmazonSellerStream):
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
+        mp = None
+        if 'marketplace_id' in self.partitions[0]:
+            mp = self.partitions[0]['marketplace_id']
         return {
             "AmazonOrderId": record["AmazonOrderId"],
+            "marketplace_id":mp
         }            
 
 class OrderItemsStream(AmazonSellerStream):
@@ -147,11 +184,19 @@ class OrderItemsStream(AmazonSellerStream):
     ).to_dict()
 
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        orders = self.get_sp_orders()
+        
         if 'AmazonOrderId' in self.partitions[0]:
             order_id = self.partitions[0]['AmazonOrderId'] 
         else:
-            return []        
+            return []   
 
+        mp = None
+        if 'marketplace_id' in self.partitions[0]:
+            mp = self.partitions[0]['marketplace_id']
+
+        orders = self.get_sp_orders(mp)
         items =   orders.get_order_items(order_id=order_id).payload
-        return [items]    
+        return [items]  
+
+
+        

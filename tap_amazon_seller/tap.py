@@ -9,6 +9,7 @@ from tap_amazon_seller.streams import (
     AmazonSellerStream,
     OrdersStream,
     OrderItemsStream,
+    MarketplacesStream,
 
 )
 # TODO: Compile a list of custom stream types here
@@ -16,6 +17,7 @@ from tap_amazon_seller.streams import (
 STREAM_TYPES = [
     OrdersStream,
     OrderItemsStream,
+    MarketplacesStream,
 ]
 
 

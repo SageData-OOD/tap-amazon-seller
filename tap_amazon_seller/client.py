@@ -34,5 +34,8 @@ class AmazonSellerStream(Stream):
             aws_secret_key=self.config.get('aws_secret_key'),
             role_arn=self.config.get('role_arn'),
         )
-    def get_sp_orders(self):
-        return Orders(credentials=self.get_credentials(),marketplace = Marketplaces[self.config.get('marketplace','US')])        
+    def get_sp_orders(self,marketplace_id=None):
+        if marketplace_id is None:
+                marketplace_id = self.config.get('marketplace','US')
+
+        return Orders(credentials=self.get_credentials(),marketplace = Marketplaces[marketplace_id])        
