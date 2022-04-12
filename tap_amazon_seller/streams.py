@@ -19,7 +19,6 @@ SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 # TODO: - Override `UsersStream` and `GroupsStream` with your own stream definition.
 #       - Copy-paste as many times as needed to create multiple stream types.
 
-
 class MarketplacesStream(AmazonSellerStream):
     """Define custom stream."""
     name = "marketplaces"
@@ -108,7 +107,7 @@ class OrdersStream(AmazonSellerStream):
         
     ).to_dict()
 
-
+    
     @throttle_retry()
     @load_all_pages()
     def load_all_orders(self, **kwargs):
@@ -138,7 +137,7 @@ class OrdersStream(AmazonSellerStream):
             for order in page.payload.get('Orders'):
                 yield order
 
-
+    
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
         mp = None
@@ -186,6 +185,7 @@ class OrderItemsStream(AmazonSellerStream):
         
     ).to_dict()
 
+    @throttle_retry()
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         
         if 'AmazonOrderId' in self.partitions[0]:
