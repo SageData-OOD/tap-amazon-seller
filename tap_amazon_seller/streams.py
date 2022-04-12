@@ -136,7 +136,6 @@ class OrdersStream(AmazonSellerStream):
 
         for page in self.load_all_orders(CreatedAfter=start_date):
             for order in page.payload.get('Orders'):
-                self.logger.info(order)
                 yield order
 
 
