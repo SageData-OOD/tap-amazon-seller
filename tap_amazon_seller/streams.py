@@ -38,7 +38,7 @@ class MarketplacesStream(AmazonSellerStream):
         }        
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         marketplaces = ["US", "CA", "MX", "BR", "ES", "GB", "FR", "NL", "DE", "IT", "SE", "PL", "EG", "TR", "SA", "AE", "IN", "SG", "AU", "JP"]
-        orders = self.get_sp_orders()
+        # orders = self.get_sp_orders()
         #Fetch minimum number of orders and verify credentials are working
         today_date = datetime.today().strftime('%Y-%m-%d')
         for mp in marketplaces:
