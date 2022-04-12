@@ -107,21 +107,26 @@ class OrdersStream(AmazonSellerStream):
         )),
         
     ).to_dict()
+
+
     @throttle_retry()
     @load_all_pages()
-    def load_all_orders(self,context):
-    
+    def load_all_orders(self, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
         """
         mp = None
         if 'marketplace_id' in self.partitions[0]:
-            mp = self.partitions[0]['marketplace_id'] 
-        
+            mp = self.partitions[0]['marketplace_id']
 
         orders = self.get_sp_orders(mp)
-        #Return test orders only for now. Change the CreatedAfter to replication key before final version
-        #and remove marketplaceids for picking up assosiated account's defualt marketplace
+
+        # Load the orders
+        return orders.get_orders(**kwargs)
+
+
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        # Get start_date
         start_date = self.get_starting_timestamp(context)
         if start_date is None:
             #Get all orders
@@ -129,12 +134,11 @@ class OrdersStream(AmazonSellerStream):
         else:
             start_date = start_date.strftime("%Y-%m-%d")
 
-        return orders.get_orders(CreatedAfter=start_date)
-
-    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        for page in self.load_all_orders(context):
+        for page in self.load_all_orders(CreatedAfter=start_date):
             for order in page.payload.get('Orders'):
+                self.logger.info(order)
                 yield order
+
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
