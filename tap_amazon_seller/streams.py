@@ -34,7 +34,8 @@ class MarketplacesStream(AmazonSellerStream):
         """Return a context dictionary for child streams."""
         return {
             "marketplace_id": record["id"],
-        }        
+        }
+    @throttle_retry()            
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         marketplaces = ["US", "CA", "MX", "BR", "ES", "GB", "FR", "NL", "DE", "IT", "SE", "PL", "EG", "TR", "SA", "AE", "IN", "SG", "AU", "JP"]
         # orders = self.get_sp_orders()
@@ -115,8 +116,8 @@ class OrdersStream(AmazonSellerStream):
         a generator function to return all pages, obtained by NextToken
         """
         mp = None
-        if 'marketplace_id' in self.partitions[0]:
-            mp = self.partitions[0]['marketplace_id']
+        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
 
         orders = self.get_sp_orders(mp)
 
@@ -131,9 +132,10 @@ class OrdersStream(AmazonSellerStream):
             #Get all orders
             start_date = '1970-01-01'
         else:
+            start_date = self.get_starting_timestamp(context)
             start_date = start_date.strftime("%Y-%m-%d")
 
-        for page in self.load_all_orders(CreatedAfter=start_date):
+        for page in self.load_all_orders(LastUpdatedAfter=start_date):
             for order in page.payload.get('Orders'):
                 yield order
 
@@ -141,8 +143,8 @@ class OrdersStream(AmazonSellerStream):
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
         mp = None
-        if 'marketplace_id' in self.partitions[0]:
-            mp = self.partitions[0]['marketplace_id']
+        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
         return {
             "AmazonOrderId": record["AmazonOrderId"],
             "marketplace_id":mp
@@ -188,14 +190,14 @@ class OrderItemsStream(AmazonSellerStream):
     @throttle_retry()
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         
-        if 'AmazonOrderId' in self.partitions[0]:
-            order_id = self.partitions[0]['AmazonOrderId'] 
+        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
         else:
             return []   
 
         mp = None
-        if 'marketplace_id' in self.partitions[0]:
-            mp = self.partitions[0]['marketplace_id']
+        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
 
         orders = self.get_sp_orders(mp)
         items =   orders.get_order_items(order_id=order_id).payload
