@@ -10,6 +10,8 @@ from tap_amazon_seller.streams import (
     OrdersStream,
     OrderItemsStream,
     MarketplacesStream,
+    OrderBuyerInfo,
+    OrderAddress
 
 )
 # TODO: Compile a list of custom stream types here
@@ -18,6 +20,8 @@ STREAM_TYPES = [
     OrdersStream,
     OrderItemsStream,
     MarketplacesStream,
+    OrderBuyerInfo,
+    OrderAddress
 ]
 
 

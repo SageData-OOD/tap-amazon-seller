@@ -60,12 +60,14 @@ class OrdersStream(AmazonSellerStream):
     # schema_filepath = SCHEMAS_DIR / "users.json"
     schema = th.PropertiesList(
         th.Property("AmazonOrderId", th.StringType),
+        th.Property("SellerOrderId", th.StringType),
         th.Property("PurchaseDate", th.DateTimeType),
         th.Property("LastUpdateDate", th.DateTimeType),
         th.Property("OrderStatus", th.StringType),
         th.Property("FulfillmentChannel", th.StringType),
         th.Property("SalesChannel", th.StringType),
         th.Property("ShipServiceLevel", th.StringType),
+        th.Property("OrderChannel", th.StringType),
         th.Property("OrderTotal", th.ObjectType(
             th.Property('CurrencyCode',th.StringType),
             th.Property('Amount',th.StringType),
@@ -74,17 +76,30 @@ class OrdersStream(AmazonSellerStream):
         th.Property('NumberOfItemsUnshipped',th.NumberType),
         th.Property('PaymentMethod',th.StringType),
         th.Property("PaymentMethodDetails", th.CustomType({"type": ["array", "string"]})),
+        th.Property("PaymentExecutionDetail", th.CustomType({"type": ["array", "string"]})),
+        th.Property("BuyerTaxInformation", th.CustomType({"type": ["object", "string"]})),
+        th.Property("MarketplaceTaxInfo", th.CustomType({"type": ["object", "string"]})),
+        th.Property("ShippingAddress", th.CustomType({"type": ["object", "string"]})),
+        th.Property("BuyerInfo", th.CustomType({"type": ["object", "string"]})),
         th.Property('IsReplacementOrder',th.BooleanType),
+        th.Property("ReplacedOrderId", th.StringType),
         th.Property("MarketplaceId", th.StringType),
+        th.Property("SellerDisplayName", th.StringType),
+        th.Property("EasyShipShipmentStatus", th.StringType),
+        th.Property("CbaDisplayableShippingLabel", th.StringType),
         th.Property("ShipmentServiceLevelCategory", th.StringType),
+        th.Property("BuyerInvoicePreference", th.StringType),
         th.Property("OrderType", th.StringType),
         th.Property("EarliestShipDate", th.DateTimeType),
         th.Property("LatestShipDate", th.DateTimeType),
         th.Property("EarliestDeliveryDate", th.DateTimeType),
+        th.Property("PromiseResponseDueDate", th.DateTimeType),
         th.Property("LatestDeliveryDate", th.DateTimeType),
         th.Property('IsBusinessOrder',th.BooleanType),
+        th.Property('IsEstimatedShipDateSet',th.BooleanType),
         th.Property('IsPrime',th.BooleanType),
         th.Property('IsGlobalExpressEnabled',th.BooleanType),
+        th.Property('HasRegulatedItems',th.BooleanType),
         th.Property('IsPremiumOrder',th.BooleanType),
         th.Property('IsSoldByAB',th.BooleanType),
         th.Property('IsIBA',th.BooleanType),
@@ -170,12 +185,28 @@ class OrderItemsStream(AmazonSellerStream):
                 th.Property("QuantityOrdered", th.NumberType),
                 th.Property("QuantityShipped", th.NumberType),
                 th.Property("ProductInfo", th.CustomType({"type": ["object", "string"]})),
+                th.Property("PointsGranted", th.CustomType({"type": ["object", "string"]})),
                 th.Property("ItemPrice", th.CustomType({"type": ["object", "string"]})),
-                th.Property("ItemTax", th.CustomType({"type": ["object", "string"]})),
+                th.Property("ShippingPrice", th.CustomType({"type": ["object", "string"]})),
+                th.Property("ShippingDiscount", th.CustomType({"type": ["object", "string"]})),
+                th.Property("ShippingDiscountTax", th.CustomType({"type": ["object", "string"]})),
                 th.Property("PromotionDiscount", th.CustomType({"type": ["object", "string"]})),
+                th.Property("PromotionDiscountTax", th.CustomType({"type": ["object", "string"]})),
+                th.Property("ItemTax", th.CustomType({"type": ["object", "string"]})),
+                th.Property("ShippingTax", th.CustomType({"type": ["object", "string"]})),
+                th.Property("PromotionIds", th.CustomType({"type": ["array", "string"]})),
+                th.Property("CODFee", th.CustomType({"type": ["object", "string"]})),
+                th.Property("CODFeeDiscount", th.CustomType({"type": ["object", "string"]})),
+                th.Property("TaxCollection", th.CustomType({"type": ["object", "string"]})),
+                th.Property("BuyerInfo", th.CustomType({"type": ["object", "string"]})),
+                th.Property("BuyerRequestedCancel", th.CustomType({"type": ["object", "string"]})),
                 th.Property("IsGift", th.StringType),
                 th.Property("ConditionId", th.StringType),
+                th.Property("ConditionNote", th.StringType),
                 th.Property("ConditionSubtypeId", th.StringType),
+                th.Property("ScheduledDeliveryStartDate", th.StringType),
+                th.Property("ScheduledDeliveryEndDate", th.StringType),
+                th.Property("PriceDesignation", th.StringType),
                 th.Property("IsTransparency", th.BooleanType),
                 th.Property("SerialNumberRequired", th.BooleanType),
                 th.Property("IossNumber", th.StringType),
@@ -201,6 +232,81 @@ class OrderItemsStream(AmazonSellerStream):
 
         orders = self.get_sp_orders(mp)
         items =   orders.get_order_items(order_id=order_id).payload
+        return [items]  
+class OrderBuyerInfo(AmazonSellerStream):
+    """Define custom stream."""
+    name = "orderbuyerinfo"
+    primary_keys = ["AmazonOrderId"]
+    replication_key = None
+    order_id = "{AmazonOrderId}"
+    parent_stream_type = OrdersStream
+    # Optionally, you may also use `schema_filepath` in place of `schema`:
+    # schema_filepath = SCHEMAS_DIR / "users.json"
+    schema = th.PropertiesList(
+        th.Property('AmazonOrderId',th.StringType),
+        th.Property('BuyerEmail',th.StringType),
+        th.Property('BuyerName',th.StringType),
+        th.Property('BuyerCounty',th.StringType),
+        th.Property("BuyerTaxInfo", th.CustomType({"type": ["object", "string"]})),
+        th.Property('PurchaseOrderNumber',th.StringType),
+    ).to_dict()
+
+    @throttle_retry()
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:       
+        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
+        else:
+            return []   
+
+        mp = None
+        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+
+        orders = self.get_sp_orders(mp)
+        items =   orders.get_order_buyer_info(order_id=order_id).payload
+        return [items]  
+class OrderAddress(AmazonSellerStream):
+    """Define custom stream."""
+    name = "orderaddress"
+    primary_keys = ["AmazonOrderId"]
+    replication_key = None
+    order_id = "{AmazonOrderId}"
+    parent_stream_type = OrdersStream
+    # Optionally, you may also use `schema_filepath` in place of `schema`:
+    # schema_filepath = SCHEMAS_DIR / "users.json"
+    schema = th.PropertiesList(
+        th.Property('AmazonOrderId',th.StringType),
+        th.Property('ShippingAddress',th.ObjectType(
+            th.Property("Name",th.StringType),
+            th.Property("AddressLine1",th.StringType),
+            th.Property("AddressLine2",th.StringType),
+            th.Property("AddressLine3",th.StringType),
+            th.Property("City",th.StringType),
+            th.Property("County",th.StringType),
+            th.Property("District",th.StringType),
+            th.Property("StateOrRegion",th.StringType),
+            th.Property("Municipality",th.StringType),
+            th.Property("PostalCode",th.StringType),
+            th.Property("CountryCode",th.StringType),
+            th.Property("Phone",th.StringType),
+            th.Property("AddressType",th.StringType),
+        ))
+    ).to_dict()
+
+    @throttle_retry()
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        
+        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
+        else:
+            return []   
+
+        mp = None
+        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+
+        orders = self.get_sp_orders(mp)
+        items =   orders.get_order_address(order_id=order_id).payload
         return [items]  
 
 
