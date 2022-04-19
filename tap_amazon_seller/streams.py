@@ -10,6 +10,7 @@ from tap_amazon_seller.client import AmazonSellerStream
 from sp_api.api import Orders
 from sp_api.base import SellingApiException
 from datetime import datetime, timedelta
+from sp_api.base.exceptions import SellingApiForbiddenException
 
 from datetime import date
 from sp_api.util import throttle_retry, load_all_pages
@@ -18,6 +19,7 @@ from sp_api.util import throttle_retry, load_all_pages
 SCHEMAS_DIR = Path(__file__).parent / Path("./schemas")
 # TODO: - Override `UsersStream` and `GroupsStream` with your own stream definition.
 #       - Copy-paste as many times as needed to create multiple stream types.
+import backoff
 
 class MarketplacesStream(AmazonSellerStream):
     """Define custom stream."""
@@ -123,7 +125,12 @@ class OrdersStream(AmazonSellerStream):
         
     ).to_dict()
 
-    
+    @backoff.on_exception(
+        backoff.expo,
+        (SellingApiForbiddenException),
+        max_tries=5,
+        factor=2,
+    )
     @throttle_retry()
     @load_all_pages()
     def load_all_orders(self, **kwargs):
@@ -217,7 +224,12 @@ class OrderItemsStream(AmazonSellerStream):
         ))
         
     ).to_dict()
-
+    @backoff.on_exception(
+        backoff.expo,
+        (SellingApiForbiddenException),
+        max_tries=5,
+        factor=2,
+    )
     @throttle_retry()
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         
