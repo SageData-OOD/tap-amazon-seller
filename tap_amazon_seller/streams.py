@@ -179,6 +179,7 @@ class OrderItemsStream(AmazonSellerStream):
     replication_key = None
     order_id = "{AmazonOrderId}"
     parent_stream_type = OrdersStream
+    schema_writed = False
     # Optionally, you may also use `schema_filepath` in place of `schema`:
     # schema_filepath = SCHEMAS_DIR / "users.json"
     schema = th.PropertiesList(
@@ -224,6 +225,7 @@ class OrderItemsStream(AmazonSellerStream):
         ))
         
     ).to_dict()
+    
     @backoff.on_exception(
         backoff.expo,
         (SellingApiForbiddenException),
@@ -232,7 +234,7 @@ class OrderItemsStream(AmazonSellerStream):
     )
     @throttle_retry()
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        
+
         if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
             order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
         else:
@@ -243,8 +245,10 @@ class OrderItemsStream(AmazonSellerStream):
             mp = self.partitions[len(self.partitions)-1]['marketplace_id']
 
         orders = self.get_sp_orders(mp)
+        self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
         items =   orders.get_order_items(order_id=order_id).payload
-        return [items]  
+        return [items]
+       
 class OrderBuyerInfo(AmazonSellerStream):
     """Define custom stream."""
     name = "orderbuyerinfo"
