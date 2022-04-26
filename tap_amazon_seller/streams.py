@@ -140,7 +140,7 @@ class OrdersStream(AmazonSellerStream):
         mp = None
         if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
             mp = self.partitions[len(self.partitions)-1]['marketplace_id']
-
+        
         orders = self.get_sp_orders(mp)
 
         # Load the orders
@@ -157,9 +157,19 @@ class OrdersStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context)
             start_date = start_date.strftime("%Y-%m-%d")
 
-        for page in self.load_all_orders(LastUpdatedAfter=start_date):
-            for order in page.payload.get('Orders'):
+        sandbox = self.config.get("sandbox")
+        if sandbox is True:
+            orders = self.get_sp_orders()
+            start_date = "TEST_CASE_200"
+            allorders = orders.get_orders(CreatedAfter='TEST_CASE_200', MarketplaceIds=["ATVPDKIKX0DER"])
+            for order in allorders.payload.get('Orders'):
                 yield order
+        else:
+            for page in self.load_all_orders(LastUpdatedAfter=start_date):
+                for order in page.payload.get('Orders'):
+                    yield order
+
+        
 
     
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
@@ -246,7 +256,11 @@ class OrderItemsStream(AmazonSellerStream):
 
         orders = self.get_sp_orders(mp)
         self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
-        items =   orders.get_order_items(order_id=order_id).payload
+        sandbox = self.config.get("sandbox")
+        if sandbox is False:
+            items =   orders.get_order_items(order_id=order_id).payload
+        else:
+            items =   orders.get_order_items("'TEST_CASE_200'").payload    
         return [items]
        
 class OrderBuyerInfo(AmazonSellerStream):
