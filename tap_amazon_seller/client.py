@@ -3,7 +3,7 @@
 import requests
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, List, Iterable
-from sp_api.api import Orders
+from sp_api.api import Orders,Finances
 from sp_api.base import Marketplaces
 
 from singer_sdk.streams import Stream
@@ -42,7 +42,7 @@ def get_state_if_exists(
         if tap_stream_id not in tap_state["bookmarks"]:
             return None
 
-        skip_incremental_partitions = ["orderitems","orderbuyerinfo","orderaddress"]
+        skip_incremental_partitions = ["orderitems","orderbuyerinfo","orderaddress","orderfinancialevents"]
         stream_state = tap_state["bookmarks"][tap_stream_id]
         if tap_stream_id in skip_incremental_partitions and "partitions" in stream_state:
             # stream_state["partitions"] = []
@@ -118,3 +118,7 @@ class AmazonSellerStream(Stream):
         if marketplace_id is None:
             marketplace_id = self.config.get('marketplace','US')
         return Orders(credentials=self.get_credentials(),marketplace = Marketplaces[marketplace_id])
+    def get_sp_finance(self,marketplace_id=None):
+        if marketplace_id is None:
+            marketplace_id = self.config.get('marketplace','US')
+        return Finances(credentials=self.get_credentials(),marketplace = Marketplaces[marketplace_id])

@@ -157,10 +157,9 @@ class OrdersStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context)
             start_date = start_date.strftime("%Y-%m-%d")
 
-        sandbox = self.config.get("sandbox")
+        sandbox = self.config.get("sandbox",False)
         if sandbox is True:
             orders = self.get_sp_orders()
-            start_date = "TEST_CASE_200"
             allorders = orders.get_orders(CreatedAfter='TEST_CASE_200', MarketplaceIds=["ATVPDKIKX0DER"])
             for order in allorders.payload.get('Orders'):
                 yield order
@@ -256,7 +255,7 @@ class OrderItemsStream(AmazonSellerStream):
 
         orders = self.get_sp_orders(mp)
         self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
-        sandbox = self.config.get("sandbox")
+        sandbox = self.config.get("sandbox",False)
         if sandbox is False:
             items =   orders.get_order_items(order_id=order_id).payload
         else:
@@ -338,6 +337,65 @@ class OrderAddress(AmazonSellerStream):
         orders = self.get_sp_orders(mp)
         items =   orders.get_order_address(order_id=order_id).payload
         return [items]  
+class OrderFinancialEvents(AmazonSellerStream):
+    """Define custom stream."""
+    name = "orderfinancialevents"
+    primary_keys = []
+    replication_key = None
+    order_id = "{AmazonOrderId}"
+    parent_stream_type = OrdersStream
+    # Optionally, you may also use `schema_filepath` in place of `schema`:
+    # schema_filepath = SCHEMAS_DIR / "users.json"
+    schema = th.PropertiesList(
+        th.Property("ShipmentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("RefundEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("GuaranteeClaimEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ChargebackEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("PayWithAmazonEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ServiceProviderCreditEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("RetrochargeEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("RentalTransactionEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ProductAdsPaymentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ServiceFeeEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("SellerDealPaymentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("DebtRecoveryEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("LoanServicingEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("AdjustmentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("SAFETReimbursementEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("SellerReviewEnrollmentPaymentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("FBALiquidationEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("CouponPaymentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ImagingServicesFeeEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("NetworkComminglingTransactionEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("AffordabilityExpenseEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("AffordabilityExpenseReversalEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("TrialShipmentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("ShipmentSettleEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("TaxWithholdingEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("RemovalShipmentEventList", th.CustomType({"type": ["array", "string"]})),
+        th.Property("RemovalShipmentAdjustmentEventList", th.CustomType({"type": ["array", "string"]})),
+    ).to_dict()
+
+    @throttle_retry()
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        
+        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
+        else:
+            return []   
+
+        mp = None
+        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+
+        finance = self.get_sp_finance(mp)
+        
+        sandbox = self.config.get("sandbox",False)
+        if sandbox is False:
+            items =   finance.get_financial_events_for_order(order_id).payload
+        else:
+            items =   finance.get_financial_events_for_order("TEST_CASE_200").payload    
+        return [items["FinancialEvents"]]  
 
 
         
