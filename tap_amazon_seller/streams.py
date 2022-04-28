@@ -10,7 +10,7 @@ from tap_amazon_seller.client import AmazonSellerStream
 from sp_api.api import Orders
 from sp_api.base import SellingApiException
 from datetime import datetime, timedelta
-from sp_api.base.exceptions import SellingApiForbiddenException
+from sp_api.base.exceptions import SellingApiForbiddenException,SellingApiRequestThrottledException
 
 from datetime import date
 from sp_api.util import throttle_retry, load_all_pages
@@ -37,7 +37,12 @@ class MarketplacesStream(AmazonSellerStream):
         return {
             "marketplace_id": record["id"],
         }
-    @throttle_retry()            
+    @backoff.on_exception(
+        backoff.expo,
+        Exception,
+        max_tries=7,
+        factor=2,
+    )            
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         marketplaces = ["US", "CA", "MX", "BR", "ES", "GB", "FR", "NL", "DE", "IT", "SE", "PL", "EG", "TR", "SA", "AE", "IN", "SG", "AU", "JP"]
         # orders = self.get_sp_orders()
@@ -127,11 +132,10 @@ class OrdersStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (SellingApiForbiddenException),
-        max_tries=5,
+        Exception,
+        max_tries=7,
         factor=2,
     )
-    @throttle_retry()
     @load_all_pages()
     def load_all_orders(self, **kwargs):
         """
@@ -148,25 +152,28 @@ class OrdersStream(AmazonSellerStream):
 
 
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        # Get start_date
-        start_date = self.get_starting_timestamp(context)
-        if start_date is None:
-            #Get all orders
-            start_date = '1970-01-01'
-        else:
+        try:
+            # Get start_date
             start_date = self.get_starting_timestamp(context)
-            start_date = start_date.strftime("%Y-%m-%d")
+            if start_date is None:
+                #Get all orders
+                start_date = '1970-01-01'
+            else:
+                start_date = self.get_starting_timestamp(context)
+                start_date = start_date.strftime("%Y-%m-%d")
 
-        sandbox = self.config.get("sandbox",False)
-        if sandbox is True:
-            orders = self.get_sp_orders()
-            allorders = orders.get_orders(CreatedAfter='TEST_CASE_200', MarketplaceIds=["ATVPDKIKX0DER"])
-            for order in allorders.payload.get('Orders'):
-                yield order
-        else:
-            for page in self.load_all_orders(LastUpdatedAfter=start_date):
-                for order in page.payload.get('Orders'):
+            sandbox = self.config.get("sandbox",False)
+            if sandbox is True:
+                orders = self.get_sp_orders()
+                allorders = orders.get_orders(CreatedAfter='TEST_CASE_200', MarketplaceIds=["ATVPDKIKX0DER"])
+                for order in allorders.payload.get('Orders'):
                     yield order
+            else:
+                for page in self.load_all_orders(LastUpdatedAfter=start_date):
+                    for order in page.payload.get('Orders'):
+                        yield order
+        except:
+            raise Exception()                
 
         
 
@@ -237,31 +244,33 @@ class OrderItemsStream(AmazonSellerStream):
     
     @backoff.on_exception(
         backoff.expo,
-        (SellingApiForbiddenException),
-        max_tries=5,
+        Exception,
+        max_tries=7,
         factor=2,
-    )
-    @throttle_retry()
+    )  
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
 
-        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-        else:
-            return []   
+            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
+            else:
+                return []   
 
-        mp = None
-        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+            mp = None
+            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
 
-        orders = self.get_sp_orders(mp)
-        self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
-        sandbox = self.config.get("sandbox",False)
-        if sandbox is False:
-            items =   orders.get_order_items(order_id=order_id).payload
-        else:
-            items =   orders.get_order_items("'TEST_CASE_200'").payload    
-        return [items]
-       
+            orders = self.get_sp_orders(mp)
+            self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
+            sandbox = self.config.get("sandbox",False)
+            if sandbox is False:
+                items =   orders.get_order_items(order_id=order_id).payload
+            else:
+                items =   orders.get_order_items("'TEST_CASE_200'").payload    
+            return [items]
+        except:
+            raise Exception()
+
 class OrderBuyerInfo(AmazonSellerStream):
     """Define custom stream."""
     name = "orderbuyerinfo"
@@ -376,26 +385,33 @@ class OrderFinancialEvents(AmazonSellerStream):
         th.Property("RemovalShipmentAdjustmentEventList", th.CustomType({"type": ["array", "string"]})),
     ).to_dict()
 
-    @throttle_retry()
+    @backoff.on_exception(
+        backoff.expo,
+        Exception,
+        max_tries=7,
+        factor=2,
+    )
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        
-        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-        else:
-            return []   
+        try:
+            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
+            else:
+                return []   
 
-        mp = None
-        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+            mp = None
+            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
 
-        finance = self.get_sp_finance(mp)
-        
-        sandbox = self.config.get("sandbox",False)
-        if sandbox is False:
-            items =   finance.get_financial_events_for_order(order_id).payload
-        else:
-            items =   finance.get_financial_events_for_order("TEST_CASE_200").payload    
-        return [items["FinancialEvents"]]  
+            finance = self.get_sp_finance(mp)
+            
+            sandbox = self.config.get("sandbox",False)
+            if sandbox is False:
+                items =   finance.get_financial_events_for_order(order_id).payload
+            else:
+                items =   finance.get_financial_events_for_order("TEST_CASE_200").payload    
+            return [items["FinancialEvents"]]  
+        except:
+            raise Exception()
 
 
         
