@@ -69,6 +69,8 @@ def get_state_partitions_list(
 ) -> Optional[List[dict]]:
     """Return a list of partitions defined in the state, or None if not defined."""
     return (get_state_if_exists(tap_state, tap_stream_id) or {}).get("partitions", None)
+
+
 class AmazonSellerStream(Stream):
     """Stream class for Amazon-Seller streams."""
     
@@ -79,11 +81,8 @@ class AmazonSellerStream(Stream):
         stream if partitioning is required for the stream. Most implementations do not
         require partitioning and should ignore the `context` argument.
         """
-        # TODO: Write logic to extract data from the upstream source.
-        # rows = mysource.getall()
-        # for row in rows:
-        #     yield row.to_dict()
         raise NotImplementedError("The method is not yet implemented (TODO)")
+
     @property
     def partitions(self) -> Optional[List[dict]]:
         """Get stream partitions.
@@ -114,10 +113,12 @@ class AmazonSellerStream(Stream):
             aws_secret_key=self.config.get('aws_secret_key'),
             role_arn=self.config.get('role_arn'),
         )
+
     def get_sp_orders(self,marketplace_id=None):
         if marketplace_id is None:
             marketplace_id = self.config.get('marketplace','US')
         return Orders(credentials=self.get_credentials(),marketplace = Marketplaces[marketplace_id])
+    
     def get_sp_finance(self,marketplace_id=None):
         if marketplace_id is None:
             marketplace_id = self.config.get('marketplace','US')
