@@ -6,7 +6,7 @@ import backoff
 from singer_sdk import typing as th
 
 from tap_amazon_seller.client import AmazonSellerStream
-from tap_amazon_seller.utils import timeout
+from tap_amazon_seller.utils import timeout, Timeout
 
 from datetime import datetime
 from sp_api.util import load_all_pages
@@ -164,7 +164,7 @@ class OrdersStream(AmazonSellerStream):
                     for order in page.payload.get('Orders'):
                         yield order
         except:
-            raise Exception
+            raise Timeout
 
 
 
@@ -258,7 +258,7 @@ class OrderItemsStream(AmazonSellerStream):
                 items = orders.get_order_items("'TEST_CASE_200'").payload
             return [items]
         except:
-            raise Exception()
+            raise Timeout
 
 class OrderBuyerInfo(AmazonSellerStream):
     """Define custom stream."""
@@ -402,7 +402,7 @@ class OrderFinancialEvents(AmazonSellerStream):
                 items =   finance.get_financial_events_for_order("TEST_CASE_200").payload    
             return [items["FinancialEvents"]]  
         except:
-            raise Exception()
+            raise Timeout
 
 
         
