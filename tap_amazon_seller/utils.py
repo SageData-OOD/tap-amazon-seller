@@ -8,6 +8,9 @@ class Timeout(Exception):
     def __str__(self):
         return repr(self.value)
 
+class InvalidResponse(Exception):
+    pass
+
 def timeout(seconds_before_timeout):
     def decorate(f):
         def handler(signum, frame):

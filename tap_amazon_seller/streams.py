@@ -6,7 +6,7 @@ import backoff
 from singer_sdk import typing as th
 
 from tap_amazon_seller.client import AmazonSellerStream
-from tap_amazon_seller.utils import timeout, Timeout
+from tap_amazon_seller.utils import timeout, Timeout, InvalidResponse
 
 from datetime import datetime
 from sp_api.util import load_all_pages
@@ -30,8 +30,8 @@ class MarketplacesStream(AmazonSellerStream):
     @backoff.on_exception(
         backoff.expo,
         Exception,
-        max_tries=7,
-        factor=2,
+        max_tries=10,
+        factor=3,
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
@@ -125,8 +125,8 @@ class OrdersStream(AmazonSellerStream):
     @backoff.on_exception(
         backoff.expo,
         Exception,
-        max_tries=7,
-        factor=2,
+        max_tries=10,
+        factor=3,
     )
     @load_all_pages()
     @timeout(15)
@@ -163,9 +163,8 @@ class OrdersStream(AmazonSellerStream):
                 for page in self.load_all_orders(LastUpdatedAfter=start_date):
                     for order in page.payload.get('Orders'):
                         yield order
-        except:
-            raise Timeout
-
+        except Exception as e:
+            raise InvalidResponse(e)
 
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
@@ -234,8 +233,8 @@ class OrderItemsStream(AmazonSellerStream):
     @backoff.on_exception(
         backoff.expo,
         Exception,
-        max_tries=7,
-        factor=2,
+        max_tries=10,
+        factor=3,
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
@@ -257,8 +256,8 @@ class OrderItemsStream(AmazonSellerStream):
             else:
                 items = orders.get_order_items("'TEST_CASE_200'").payload
             return [items]
-        except:
-            raise Timeout
+        except Exception as e:
+            raise InvalidResponse(e)
 
 class OrderBuyerInfo(AmazonSellerStream):
     """Define custom stream."""
@@ -279,18 +278,21 @@ class OrderBuyerInfo(AmazonSellerStream):
     ).to_dict()
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-        else:
-            return []   
+        try:
+            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
+            else:
+                return []   
 
-        mp = None
-        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+            mp = None
+            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
 
-        orders = self.get_sp_orders(mp)
-        items =   orders.get_order_buyer_info(order_id=order_id).payload
-        return [items]
+            orders = self.get_sp_orders(mp)
+            items =   orders.get_order_buyer_info(order_id=order_id).payload
+            return [items]
+        except Exception as e:
+            raise InvalidResponse(e)
 
 
 class OrderAddress(AmazonSellerStream):
@@ -322,18 +324,21 @@ class OrderAddress(AmazonSellerStream):
     ).to_dict()
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-            order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-        else:
-            return []   
+        try:
+            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
+                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
+            else:
+                return []   
 
-        mp = None
-        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+            mp = None
+            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
+                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
 
-        orders = self.get_sp_orders(mp)
-        items =   orders.get_order_address(order_id=order_id).payload
-        return [items]
+            orders = self.get_sp_orders(mp)
+            items =   orders.get_order_address(order_id=order_id).payload
+            return [items]
+        except Exception as e:
+            raise InvalidResponse(e)
 
 
 class OrderFinancialEvents(AmazonSellerStream):
@@ -379,8 +384,8 @@ class OrderFinancialEvents(AmazonSellerStream):
     @backoff.on_exception(
         backoff.expo,
         Exception,
-        max_tries=7,
-        factor=2,
+        max_tries=10,
+        factor=3,
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
@@ -398,13 +403,10 @@ class OrderFinancialEvents(AmazonSellerStream):
             
             sandbox = self.config.get("sandbox",False)
             if sandbox is False:
-                items =   finance.get_financial_events_for_order(order_id).payload
-                items["AmazonOrderId"].update({"AmazonOrderId":order_id})
+                items = finance.get_financial_events_for_order(order_id).payload
+                items["AmazonOrderId"] = order_id
             else:
-                items =   finance.get_financial_events_for_order("TEST_CASE_200").payload    
+                items = finance.get_financial_events_for_order("TEST_CASE_200").payload    
             return [items["FinancialEvents"]]  
-        except:
-            raise Timeout
-
-
-        
+        except Exception as e:
+            raise InvalidResponse(e)
