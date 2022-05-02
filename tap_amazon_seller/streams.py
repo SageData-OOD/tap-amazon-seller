@@ -356,6 +356,7 @@ class OrderFinancialEvents(AmazonSellerStream):
     # Optionally, you may also use `schema_filepath` in place of `schema`:
     # schema_filepath = SCHEMAS_DIR / "users.json"
     schema = th.PropertiesList(
+        th.Property("AmazonOrderId", th.StringType),
         th.Property("ShipmentEventList", th.CustomType({"type": ["array", "string"]})),
         th.Property("RefundEventList", th.CustomType({"type": ["array", "string"]})),
         th.Property("GuaranteeClaimEventList", th.CustomType({"type": ["array", "string"]})),
@@ -407,6 +408,7 @@ class OrderFinancialEvents(AmazonSellerStream):
             sandbox = self.config.get("sandbox",False)
             if sandbox is False:
                 items =   finance.get_financial_events_for_order(order_id).payload
+                items["AmazonOrderId"].update({"AmazonOrderId":order_id})
             else:
                 items =   finance.get_financial_events_for_order("TEST_CASE_200").payload    
             return [items["FinancialEvents"]]  
