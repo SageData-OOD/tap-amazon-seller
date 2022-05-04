@@ -130,28 +130,19 @@ class OrdersStream(AmazonSellerStream):
     )
     @load_all_pages()
     @timeout(15)
-    def load_all_orders(self, **kwargs):
+    def load_all_orders(self, mp, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        mp = None
-        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
         orders = self.get_sp_orders(mp)
-        # Load the orders
         return orders.get_orders(**kwargs)
 
 
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
             # Get start_date
-            start_date = self.get_starting_timestamp(context)
-            if start_date is None:
-                #Get all orders
-                start_date = '1970-01-01'
-            else:
-                start_date = self.get_starting_timestamp(context)
-                start_date = start_date.strftime("%Y-%m-%d")
+            start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
+            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
 
             sandbox = self.config.get("sandbox",False)
             if sandbox is True:
@@ -160,7 +151,7 @@ class OrdersStream(AmazonSellerStream):
                 for order in allorders.payload.get('Orders'):
                     yield order
             else:
-                for page in self.load_all_orders(LastUpdatedAfter=start_date):
+                for page in self.load_all_orders(mp=context.get("marketplace_id"), LastUpdatedAfter=start_date):
                     for order in page.payload.get('Orders'):
                         yield order
         except Exception as e:
