@@ -124,20 +124,39 @@ class OrdersStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        Exception,
+        (Exception, InvalidResponse),
         max_tries=10,
         factor=3,
     )
-    @load_all_pages()
     @timeout(15)
+    @load_all_pages()
     def load_all_orders(self, mp, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        orders = self.get_sp_orders(mp)
-        return orders.get_orders(**kwargs)
+        try:
+            orders = self.get_sp_orders(mp)
+            orders_obj = orders.get_orders(**kwargs)
+            return orders_obj
+        except Exception as e:
+            raise InvalidResponse(e)
 
+    def load_order_page(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+        orders = []
+        for page in self.load_all_orders(mp, **kwargs):
+            for order in page.payload.get('Orders'):
+                orders.append(order)
+        return orders
 
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception, InvalidResponse),
+        max_tries=10,
+        factor=3,
+    )
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
             # Get start_date
@@ -146,23 +165,15 @@ class OrdersStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox",False)
             if sandbox is True:
-                orders = self.get_sp_orders()
-                allorders = orders.get_orders(CreatedAfter='TEST_CASE_200', MarketplaceIds=["ATVPDKIKX0DER"])
-                for order in allorders.payload.get('Orders'):
-                    yield order
+                return self.load_order_page(mp="ATVPDKIKX0DER", CreatedAfter='TEST_CASE_200')
             else:
-                for page in self.load_all_orders(mp=context.get("marketplace_id"), LastUpdatedAfter=start_date):
-                    for order in page.payload.get('Orders'):
-                        yield order
+                return self.load_order_page(mp=context.get("marketplace_id"), LastUpdatedAfter=start_date)
         except Exception as e:
             raise InvalidResponse(e)
 
-
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
-        mp = None
-        if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-            mp = self.partitions[len(self.partitions)-1]['marketplace_id']
+        mp = context.get('marketplace_id')
         return {
             "AmazonOrderId": record["AmazonOrderId"],
             "marketplace_id":mp
@@ -230,17 +241,10 @@ class OrderItemsStream(AmazonSellerStream):
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
-            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-            else:
-                return []   
+            order_id = context.get('AmazonOrderId', []) 
 
-            mp = None
-            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
-
-            orders = self.get_sp_orders(mp)
-            self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
+            orders = self.get_sp_orders(context.get("marketplace_id"))
+            self.state_partitioning_keys = context
             sandbox = self.config.get("sandbox",False)
             if sandbox is False:
                 items = orders.get_order_items(order_id=order_id).payload
@@ -270,16 +274,9 @@ class OrderBuyerInfo(AmazonSellerStream):
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
-            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-            else:
-                return []   
+            order_id = context.get('AmazonOrderId', []) 
 
-            mp = None
-            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
-
-            orders = self.get_sp_orders(mp)
+            orders = self.get_sp_orders(context.get("marketplace_id"))
             items =   orders.get_order_buyer_info(order_id=order_id).payload
             return [items]
         except Exception as e:
@@ -316,16 +313,9 @@ class OrderAddress(AmazonSellerStream):
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
-            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-            else:
-                return []   
+            order_id = context.get('AmazonOrderId', []) 
 
-            mp = None
-            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
-
-            orders = self.get_sp_orders(mp)
+            orders = self.get_sp_orders(context.get("marketplace_id"))
             items =   orders.get_order_address(order_id=order_id).payload
             return [items]
         except Exception as e:
@@ -381,16 +371,9 @@ class OrderFinancialEvents(AmazonSellerStream):
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
-            if 'AmazonOrderId' in self.partitions[len(self.partitions)-1]:
-                order_id = self.partitions[len(self.partitions)-1]['AmazonOrderId'] 
-            else:
-                return []   
+            order_id = context.get('AmazonOrderId', []) 
 
-            mp = None
-            if 'marketplace_id' in self.partitions[len(self.partitions)-1]:
-                mp = self.partitions[len(self.partitions)-1]['marketplace_id']
-
-            finance = self.get_sp_finance(mp)
+            finance = self.get_sp_finance(context.get("marketplace_id"))
             
             sandbox = self.config.get("sandbox",False)
             if sandbox is False:

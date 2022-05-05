@@ -117,9 +117,9 @@ class AmazonSellerStream(Stream):
     def get_sp_orders(self,marketplace_id=None):
         if marketplace_id is None:
             marketplace_id = self.config.get('marketplace','US')
-        return Orders(credentials=self.get_credentials(),marketplace = Marketplaces[marketplace_id])
+        return Orders(credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id])
     
     def get_sp_finance(self,marketplace_id=None):
         if marketplace_id is None:
             marketplace_id = self.config.get('marketplace','US')
-        return Finances(credentials=self.get_credentials(),marketplace = Marketplaces[marketplace_id])
+        return Finances(credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id])
