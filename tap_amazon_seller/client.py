@@ -46,7 +46,8 @@ def get_state_if_exists(
         stream_state = tap_state["bookmarks"][tap_stream_id]
         if tap_stream_id in skip_incremental_partitions and "partitions" in stream_state:
             # stream_state["partitions"] = []
-            stream_state["partitions"] = [{"context":stream_state["partitions"][len(stream_state["partitions"])-1]["context"]}]
+            partitions = stream_state["partitions"][len(stream_state["partitions"])-1]["context"]
+            stream_state["partitions"] = [{"context":partitions}]
         
         if not state_partition_context:
             if key:
