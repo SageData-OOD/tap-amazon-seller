@@ -244,7 +244,9 @@ class OrderItemsStream(AmazonSellerStream):
             order_id = context.get('AmazonOrderId', []) 
 
             orders = self.get_sp_orders(context.get("marketplace_id"))
-            self.state_partitioning_keys = context
+            # self.state_partitioning_keys = context
+            self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
+            # self.state_partitioning_keys = self.partitions
             sandbox = self.config.get("sandbox",False)
             if sandbox is False:
                 items = orders.get_order_items(order_id=order_id).payload
@@ -377,6 +379,8 @@ class OrderFinancialEvents(AmazonSellerStream):
             
             sandbox = self.config.get("sandbox",False)
             if sandbox is False:
+                # self.state_partitioning_keys = self.partitions
+                self.state_partitioning_keys = self.partitions[len(self.partitions)-1]
                 items = finance.get_financial_events_for_order(order_id).payload
                 items["AmazonOrderId"] = order_id
             else:
