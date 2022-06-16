@@ -47,11 +47,7 @@ class TapAmazonSeller(Tap):
         th.Property(
             "report_types",
             th.CustomType({"type": ["array", "string"]}),
-            default=[
-                "GET_LEDGER_DETAIL_VIEW_DATA",
-                "FEE_DISCOUNTS_REPORT",
-                "GET_AFN_INVENTORY_DATA",
-            ],
+            default=["GET_LEDGER_DETAIL_VIEW_DATA"],
         ),
         th.Property(
             "processing_status",
