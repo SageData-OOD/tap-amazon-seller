@@ -1,15 +1,14 @@
 """Stream type classes for tap-amazon-seller."""
 
-from typing import Any, Dict, Optional, Union, List, Iterable
-import backoff
+from datetime import datetime
+from typing import Any, Dict, Iterable, List, Optional, Union
 
+import backoff
 from singer_sdk import typing as th
+from sp_api.util import load_all_pages
 
 from tap_amazon_seller.client import AmazonSellerStream
-from tap_amazon_seller.utils import timeout, Timeout, InvalidResponse
-
-from datetime import datetime
-from sp_api.util import load_all_pages
+from tap_amazon_seller.utils import InvalidResponse, Timeout, timeout
 
 
 class MarketplacesStream(AmazonSellerStream):

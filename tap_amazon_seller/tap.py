@@ -2,18 +2,18 @@
 
 from typing import List
 
-from singer_sdk import Tap, Stream
+from singer_sdk import Stream, Tap
 from singer_sdk import typing as th  # JSON schema typing helpers
 
 # TODO: Import your custom stream types here:
 from tap_amazon_seller.streams import (
     AmazonSellerStream,
-    OrdersStream,
-    OrderItemsStream,
     MarketplacesStream,
-    OrderBuyerInfo,
     OrderAddress,
+    OrderBuyerInfo,
     OrderFinancialEvents,
+    OrderItemsStream,
+    OrdersStream,
     ReportsStream,
 )
 

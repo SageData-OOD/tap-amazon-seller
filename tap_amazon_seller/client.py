@@ -1,13 +1,12 @@
 """Custom client handling, including Amazon-SellerStream base class."""
 
-import requests
 from pathlib import Path
-from typing import Any, Dict, Optional, Union, List, Iterable
-from sp_api.api import Orders, Finances, ReportsV2
-from sp_api.base import Marketplaces
+from typing import Any, Dict, Iterable, List, Optional, Union, cast
 
+import requests
 from singer_sdk.streams import Stream
-from typing import Any, List, Optional, Union, cast
+from sp_api.api import Finances, Orders, ReportsV2
+from sp_api.base import Marketplaces
 
 
 def _find_in_partitions_list(
