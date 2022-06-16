@@ -2,19 +2,24 @@ import signal
 import time
 from contextlib import contextmanager
 
+
 class Timeout(Exception):
-    def __init__(self, value = "Timed Out"):
+    def __init__(self, value="Timed Out"):
         self.value = value
+
     def __str__(self):
         return repr(self.value)
 
+
 class InvalidResponse(Exception):
     pass
+
 
 def timeout(seconds_before_timeout):
     def decorate(f):
         def handler(signum, frame):
             raise Timeout()
+
         def new_f(*args, **kwargs):
             old = signal.signal(signal.SIGALRM, handler)
             old_time_left = signal.alarm(seconds_before_timeout)
@@ -29,6 +34,8 @@ def timeout(seconds_before_timeout):
                 signal.signal(signal.SIGALRM, old)
                 signal.alarm(old_time_left)
             return result
+
         new_f.__name__ = f.__name__
         return new_f
+
     return decorate
