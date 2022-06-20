@@ -1,14 +1,19 @@
 """Stream type classes for tap-amazon-seller."""
 
+import csv
+import os
+import time
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Iterable, Optional
 
 import backoff
 from singer_sdk import typing as th
 from sp_api.util import load_all_pages
 
 from tap_amazon_seller.client import AmazonSellerStream
-from tap_amazon_seller.utils import InvalidResponse, Timeout, timeout
+from tap_amazon_seller.utils import InvalidResponse, timeout
+
+ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
 
 class MarketplacesStream(AmazonSellerStream):
@@ -17,7 +22,6 @@ class MarketplacesStream(AmazonSellerStream):
     name = "marketplaces"
     primary_keys = ["id"]
     replication_key = None
-
     schema = th.PropertiesList(
         th.Property("id", th.StringType),
         th.Property("name", th.StringType),
@@ -547,19 +551,81 @@ class ReportsStream(AmazonSellerStream):
     name = "reports"
     primary_keys = ["reportId"]
     replication_key = None
+    report_id = None
+    document_id = None
     schema = th.PropertiesList(
         th.Property("marketplaceIds", th.CustomType({"type": ["array", "string"]})),
         th.Property("reportId", th.StringType),
-        th.Property("reportType", th.StringType),
-        th.Property("dataStartTime", th.DateTimeType),
-        th.Property("dataEndTime", th.DateTimeType),
-        th.Property("dataEndreportScheduleIdime", th.StringType),
-        th.Property("createdTime", th.DateTimeType),
-        th.Property("processingStatus", th.StringType),
-        th.Property("processingStartTime", th.DateTimeType),
-        th.Property("processingEndTime", th.DateTimeType),
-        th.Property("reportDocumentId", th.StringType),
+        th.Property("Date", th.DateTimeType),
+        th.Property("FNSKU", th.StringType),
+        th.Property("ASIN", th.StringType),
+        th.Property("MSKU", th.StringType),
+        th.Property("Title", th.StringType),
+        th.Property("Event Type", th.StringType),
+        th.Property("Reference ID", th.StringType),
+        th.Property("Quantity", th.StringType),
+        th.Property("Fulfillment Center", th.StringType),
+        th.Property("Disposition", th.StringType),
+        th.Property("Reason", th.StringType),
+        th.Property("Country", th.StringType),
+        # th.Property("reportType", th.StringType),
+        # th.Property("dataStartTime", th.DateTimeType),
+        # th.Property("dataEndTime", th.DateTimeType),
+        # th.Property("dataEndreportScheduleIdime", th.StringType),
+        # th.Property("createdTime", th.DateTimeType),
+        # th.Property("processingStatus", th.StringType),
+        # th.Property("processingStartTime", th.DateTimeType),
+        # th.Property("processingEndTime", th.DateTimeType),
+        # th.Property("reportDocumentId", th.StringType),
     ).to_dict()
+
+    def create_report(self, start_date, type="GET_LEDGER_DETAIL_VIEW_DATA"):
+        reports = self.get_sp_reports()
+        res = reports.create_report(reportType=type, dataStartTime=start_date).payload
+        if "reportId" in res:
+            self.report_id = res["reportId"]
+            return self.check_report(res["reportId"], reports)
+
+    def get_report(self, report_id, reports):
+        return reports.get_report(report_id)
+
+    def save_document(self, document_id, reports):
+        res = reports.get_report_document(
+            document_id,
+            decrypt=True,
+            file=f"{ROOT_DIR}/{document_id}_document.csv",
+            download=True,
+        )
+        self.reportDocumentId = document_id
+        return res
+
+    def read_csv(self, file):
+        finalList = []
+        file = f"{ROOT_DIR}/{file}"
+        if os.path.isfile(file):
+            with open(file) as data:
+                data_reader = csv.DictReader(data, delimiter="\t")
+                for row in data_reader:
+                    row["reportId"] = self.report_id
+                    finalList.append(dict(row))
+            # os.remove(file)
+        return finalList
+
+    def check_report(self, report_id, reports):
+        res = []
+        while True:
+            report = self.get_report(report_id, reports).payload
+            # Break the loop if the report processing is done
+            if report["processingStatus"] == "DONE":
+                document_id = report["reportDocumentId"]
+                # save the document
+                self.save_document(document_id, reports)
+                res = self.read_csv(f"./{document_id}_document.csv")
+                break
+            else:
+                time.sleep(30)
+                continue
+        return res
 
     @backoff.on_exception(
         backoff.expo,
@@ -570,7 +636,12 @@ class ReportsStream(AmazonSellerStream):
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
-
+            start_date = self.get_starting_timestamp(context) or datetime.today()
+            if self.config.get("start_date"):
+                start_date = datetime.strptime(
+                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = self.config.get("report_types")
             processing_status = self.config.get("processing_status")
             marketplace_id = None
@@ -580,8 +651,20 @@ class ReportsStream(AmazonSellerStream):
             report = self.get_sp_reports()
 
             items = report.get_reports(
-                reportTypes=report_types, processingStatuses=processing_status
+                reportTypes=report_types,
+                processingStatuses=processing_status,
+                dataStartTime=start_date,
             ).payload
-            return items["reports"]
+            if not items["reports"]:
+                reports = self.create_report(start_date)
+                for row in reports:
+                    yield row
+
+            # If reports are form loop through, download documents and populate the data.txt
+            for row in items["reports"]:
+                reports = self.check_report(row["reportId"], report)
+                for report_row in reports:
+                    yield report_row
+
         except Exception as e:
             raise InvalidResponse(e)
