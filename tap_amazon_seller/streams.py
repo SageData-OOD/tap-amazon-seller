@@ -579,9 +579,18 @@ class ReportsStream(AmazonSellerStream):
         # th.Property("reportDocumentId", th.StringType),
     ).to_dict()
 
-    def create_report(self, start_date, type="GET_LEDGER_DETAIL_VIEW_DATA"):
+    def create_report(
+        self, start_date, end_date=None, type="GET_LEDGER_DETAIL_VIEW_DATA"
+    ):
         reports = self.get_sp_reports()
-        res = reports.create_report(reportType=type, dataStartTime=start_date).payload
+        if start_date and end_date is not None:
+            res = reports.create_report(
+                reportType=type, dataStartTime=start_date, dataEndTime=end_date
+            ).payload
+        else:
+            res = reports.create_report(
+                reportType=type, dataStartTime=start_date
+            ).payload
         if "reportId" in res:
             self.report_id = res["reportId"]
             return self.check_report(res["reportId"], reports)
@@ -608,7 +617,7 @@ class ReportsStream(AmazonSellerStream):
                 for row in data_reader:
                     row["reportId"] = self.report_id
                     finalList.append(dict(row))
-            # os.remove(file)
+            os.remove(file)
         return finalList
 
     def check_report(self, report_id, reports):
@@ -637,9 +646,14 @@ class ReportsStream(AmazonSellerStream):
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
             start_date = self.get_starting_timestamp(context) or datetime.today()
+            end_date = None
             if self.config.get("start_date"):
                 start_date = datetime.strptime(
                     self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            if self.config.get("end_date"):
+                end_date = datetime.strptime(
+                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
                 )
             start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = self.config.get("report_types")
@@ -649,14 +663,23 @@ class ReportsStream(AmazonSellerStream):
                 marketplace_id = context.get("marketplace_id")
 
             report = self.get_sp_reports()
+            if start_date and end_date is not None:
+                end_date = end_date.strftime("%Y-%m-%dT23:59:59")
+                items = report.get_reports(
+                    reportTypes=report_types,
+                    processingStatuses=processing_status,
+                    dataStartTime=start_date,
+                    dataEndTime=end_date,
+                ).payload
+            else:
+                items = report.get_reports(
+                    reportTypes=report_types,
+                    processingStatuses=processing_status,
+                    dataStartTime=start_date,
+                ).payload
 
-            items = report.get_reports(
-                reportTypes=report_types,
-                processingStatuses=processing_status,
-                dataStartTime=start_date,
-            ).payload
             if not items["reports"]:
-                reports = self.create_report(start_date)
+                reports = self.create_report(start_date, end_date)
                 for row in reports:
                     yield row
 
