@@ -645,7 +645,7 @@ class ReportsStream(AmazonSellerStream):
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
-            start_date = self.get_starting_timestamp(context) or datetime.today()
+            start_date = self.get_starting_timestamp(context) or  datetime(2005, 1, 1)
             end_date = None
             if self.config.get("start_date"):
                 start_date = datetime.strptime(
