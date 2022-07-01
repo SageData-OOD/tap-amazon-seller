@@ -1,9 +1,8 @@
 """Custom client handling, including Amazon-SellerStream base class."""
 
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Union, cast
 
-import requests
+from typing import Any, List, Optional, cast
+
 from singer_sdk.streams import Stream
 from sp_api.api import Finances, Orders, ReportsV2
 from sp_api.base import Marketplaces
@@ -82,27 +81,8 @@ def get_state_partitions_list(
 class AmazonSellerStream(Stream):
     """Stream class for Amazon-Seller streams."""
 
-    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        """Return a generator of row-type dictionary objects.
-
-        The optional `context` argument is used to identify a specific slice of the
-        stream if partitioning is required for the stream. Most implementations do not
-        require partitioning and should ignore the `context` argument.
-        """
-        raise NotImplementedError("The method is not yet implemented (TODO)")
-
     @property
     def partitions(self) -> Optional[List[dict]]:
-        """Get stream partitions.
-
-        Developers may override this property to provide a default partitions list.
-
-        By default, this method returns a list of any partitions which are already
-        defined in state, otherwise None.
-
-        Returns:
-            A list of partition key dicts (if applicable), otherwise `None`.
-        """
         result: List[dict] = []
         for partition_state in (
             get_state_partitions_list(self.tap_state, self.name) or []

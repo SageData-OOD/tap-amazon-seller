@@ -190,11 +190,13 @@ class OrdersStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        orders = []
+
         for page in self.load_all_orders(mp, **kwargs):
+            orders = []
             for order in page.payload.get("Orders"):
                 orders.append(order)
-        return orders
+
+            yield orders
 
     @backoff.on_exception(
         backoff.expo,
@@ -214,9 +216,12 @@ class OrdersStream(AmazonSellerStream):
                     mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
                 )
             else:
-                return self.load_order_page(
+                rows = self.load_order_page(
                     mp=context.get("marketplace_id"), LastUpdatedAfter=start_date
                 )
+            for row in rows:
+                for item in row:
+                    yield item
         except Exception as e:
             raise InvalidResponse(e)
 
@@ -645,7 +650,7 @@ class ReportsStream(AmazonSellerStream):
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
-            start_date = self.get_starting_timestamp(context) or  datetime(2005, 1, 1)
+            start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
             end_date = None
             if self.config.get("start_date"):
                 start_date = datetime.strptime(
