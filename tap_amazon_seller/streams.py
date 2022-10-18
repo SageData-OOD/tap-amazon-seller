@@ -746,7 +746,6 @@ class WarehouseInventory(AmazonSellerStream):
 
         for page in self.load_all_items(mp, **kwargs):
             yield page.payload
-            break
 
     @backoff.on_exception(
         backoff.expo,
