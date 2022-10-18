@@ -15,6 +15,7 @@ from tap_amazon_seller.streams import (
     OrderItemsStream,
     OrdersStream,
     ReportsStream,
+    WarehouseInventory,
 )
 
 # TODO: Compile a list of custom stream types here
@@ -27,6 +28,7 @@ STREAM_TYPES = [
     OrderAddress,
     OrderFinancialEvents,
     ReportsStream,
+    WarehouseInventory,
 ]
 
 

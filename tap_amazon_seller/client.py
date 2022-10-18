@@ -4,7 +4,7 @@
 from typing import Any, List, Optional, cast
 
 from singer_sdk.streams import Stream
-from sp_api.api import Finances, Orders, ReportsV2
+from sp_api.api import Finances, Inventories, Orders, ReportsV2
 from sp_api.base import Marketplaces
 
 
@@ -123,5 +123,12 @@ class AmazonSellerStream(Stream):
         if marketplace_id is None:
             marketplace_id = self.config.get("marketplace", "US")
         return ReportsV2(
+            credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+        )
+
+    def get_warehouse_object(self, marketplace_id=None):
+        if marketplace_id is None:
+            marketplace_id = self.config.get("marketplace", "US")
+        return Inventories(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )

@@ -696,3 +696,79 @@ class ReportsStream(AmazonSellerStream):
 
         except Exception as e:
             raise InvalidResponse(e)
+
+
+class WarehouseInventory(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "warehouse_inventory"
+    primary_keys = ["asin", "fnSku", "sellerSku"]
+    replication_key = None
+    parent_stream_type = MarketplacesStream
+    marketplace_id = "{marketplace_id}"
+    schema = th.PropertiesList(
+        th.Property("marketplace_id", th.StringType),
+        th.Property("granularityType", th.StringType),
+        th.Property("granularityId", th.StringType),
+        th.Property("asin", th.StringType),
+        th.Property("fnSku", th.StringType),
+        th.Property("sellerSku", th.StringType),
+        th.Property("condition", th.StringType),
+        th.Property("lastUpdatedTime", th.DateTimeType),
+        th.Property("productName", th.StringType),
+        th.Property("totalQuantity", th.NumberType),
+        th.Property("inventoryDetails", th.CustomType({"type": ["object", "string"]})),
+    ).to_dict()
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception, InvalidResponse),
+        max_tries=10,
+        factor=3,
+    )
+    @timeout(15)
+    @load_all_pages()
+    def load_all_items(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+        try:
+            wi = self.get_warehouse_object(mp)
+            list = wi.get_inventory_summary_marketplace(**{"details": True})
+            return list
+        except Exception as e:
+            raise InvalidResponse(e)
+
+    def load_item_page(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+
+        for page in self.load_all_items(mp, **kwargs):
+            yield page.payload
+            break
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception, InvalidResponse),
+        max_tries=10,
+        factor=3,
+    )
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+
+            rows = self.load_item_page(mp=context.get("marketplace_id"))
+            for row in rows:
+                return_row = {"marketplace_id": context.get("marketplace_id")}
+                if "granularity" in row:
+                    return_row.update(row["granularity"])
+                    if "inventorySummaries" in row:
+                        if len(row["inventorySummaries"]) > 0:
+                            for summary in row["inventorySummaries"]:
+                                return_row.update(summary)
+                                yield return_row
+                    else:
+                        return_row.update({"lastUpdatedTime": ""})
+                yield return_row
+        except Exception as e:
+            raise InvalidResponse(e)
