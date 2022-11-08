@@ -12,7 +12,7 @@ from sp_api.util import load_all_pages
 
 from tap_amazon_seller.client import AmazonSellerStream
 from tap_amazon_seller.utils import InvalidResponse, timeout
-
+from sp_api.base.exceptions import SellingApiServerException
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
 
@@ -169,7 +169,7 @@ class OrdersStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse),
+        (Exception, InvalidResponse,SellingApiServerException),
         max_tries=10,
         factor=3,
     )
@@ -200,7 +200,7 @@ class OrdersStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse),
+        (Exception, InvalidResponse,SellingApiServerException),
         max_tries=10,
         factor=3,
     )
@@ -722,7 +722,7 @@ class WarehouseInventory(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse),
+        (Exception, InvalidResponse, SellingApiServerException),
         max_tries=10,
         factor=3,
     )
@@ -749,7 +749,7 @@ class WarehouseInventory(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse),
+        (Exception, InvalidResponse, SellingApiServerException),
         max_tries=10,
         factor=3,
     )
