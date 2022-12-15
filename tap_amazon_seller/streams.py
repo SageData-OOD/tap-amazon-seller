@@ -13,6 +13,7 @@ from sp_api.util import load_all_pages
 from tap_amazon_seller.client import AmazonSellerStream
 from tap_amazon_seller.utils import InvalidResponse, timeout
 from sp_api.base.exceptions import SellingApiServerException
+from dateutil.relativedelta import relativedelta
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
 
@@ -700,7 +701,7 @@ class ReportsStream(AmazonSellerStream):
 
 class WarehouseInventory(AmazonSellerStream):
     """Define custom stream."""
-
+    next_token = None
     name = "warehouse_inventory"
     primary_keys = ["asin", "fnSku", "sellerSku"]
     replication_key = None
@@ -734,7 +735,11 @@ class WarehouseInventory(AmazonSellerStream):
         """
         try:
             wi = self.get_warehouse_object(mp)
-            list = wi.get_inventory_summary_marketplace(**{"details": True})
+            kwargs.update({'details':True})
+            if self.next_token is not None:
+                kwargs.update({'nextToken':self.next_token})
+
+            list = wi.get_inventory_summary_marketplace(**kwargs)
             return list
         except Exception as e:
             raise InvalidResponse(e)
@@ -745,6 +750,7 @@ class WarehouseInventory(AmazonSellerStream):
         """
 
         for page in self.load_all_items(mp, **kwargs):
+            self.next_token = page.next_token
             yield page.payload
 
     @backoff.on_exception(
@@ -755,8 +761,11 @@ class WarehouseInventory(AmazonSellerStream):
     )
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
+            six_months_ago = datetime.today() - relativedelta(months=18)
+            start_date = self.get_starting_timestamp(context) or six_months_ago
+            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+            rows = self.load_item_page(mp=context.get("marketplace_id"),startDateTime=start_date)
 
-            rows = self.load_item_page(mp=context.get("marketplace_id"))
             for row in rows:
                 return_row = {"marketplace_id": context.get("marketplace_id")}
                 if "granularity" in row:
