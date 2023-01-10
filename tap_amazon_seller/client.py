@@ -4,8 +4,13 @@
 from typing import Any, List, Optional, cast
 
 from singer_sdk.streams import Stream
-from sp_api.api import Finances, Inventories, Orders, ReportsV2
+from sp_api.api import Finances, Inventories, Orders, ReportsV2, Catalog
 from sp_api.base import Marketplaces
+import csv
+import os
+import time
+
+ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
 
 def _find_in_partitions_list(
@@ -130,5 +135,69 @@ class AmazonSellerStream(Stream):
         if marketplace_id is None:
             marketplace_id = self.config.get("marketplace", "US")
         return Inventories(
+            credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+        )
+
+    def create_report(
+        self, start_date, reports, end_date=None, type="GET_LEDGER_DETAIL_VIEW_DATA"
+    ):
+
+        if start_date and end_date is not None:
+            res = reports.create_report(
+                reportType=type, dataStartTime=start_date, dataEndTime=end_date
+            ).payload
+        else:
+            res = reports.create_report(
+                reportType=type, dataStartTime=start_date
+            ).payload
+        if "reportId" in res:
+            self.report_id = res["reportId"]
+            return self.check_report(res["reportId"], reports)
+
+    def get_report(self, report_id, reports):
+        return reports.get_report(report_id)
+
+    def save_document(self, document_id, reports):
+        res = reports.get_report_document(
+            document_id,
+            decrypt=True,
+            file=f"{ROOT_DIR}/{document_id}_document.csv",
+            download=True,
+        )
+        self.reportDocumentId = document_id
+        return res
+
+    def read_csv(self, file):
+        finalList = []
+        file = f"{ROOT_DIR}/{file}"
+        if os.path.isfile(file):
+            with open(file, encoding="ISO-8859-1") as data:
+                data_reader = csv.DictReader(data, delimiter="\t")
+                for row in data_reader:
+                    row["reportId"] = self.report_id
+                    finalList.append(dict(row))
+            os.remove(file)
+        return finalList
+
+    def check_report(self, report_id, reports):
+        res = []
+        while True:
+            report = self.get_report(report_id, reports).payload
+            # Break the loop if the report processing is done
+            if report["processingStatus"] == "DONE":
+                document_id = report["reportDocumentId"]
+                # save the document
+                self.save_document(document_id, reports)
+                res = self.read_csv(f"./{document_id}_document.csv")
+                break
+            else:
+                time.sleep(30)
+                continue
+        return res
+
+    def get_sp_catalog(self, marketplace_id=None):
+        if marketplace_id is None:
+            marketplace_id = self.config.get("marketplace", "US")
+        return Catalog(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )

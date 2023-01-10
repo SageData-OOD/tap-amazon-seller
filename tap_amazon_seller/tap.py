@@ -5,7 +5,6 @@ from typing import List
 from singer_sdk import Stream, Tap
 from singer_sdk import typing as th  # JSON schema typing helpers
 
-# TODO: Import your custom stream types here:
 from tap_amazon_seller.streams import (
     AmazonSellerStream,
     MarketplacesStream,
@@ -16,10 +15,10 @@ from tap_amazon_seller.streams import (
     OrdersStream,
     ReportsStream,
     WarehouseInventory,
+    ProductsIventoryStream,
+    ProductDetails,
 )
 
-# TODO: Compile a list of custom stream types here
-#       OR rewrite discover_streams() below with your custom logic.
 STREAM_TYPES = [
     OrdersStream,
     OrderItemsStream,
@@ -29,6 +28,8 @@ STREAM_TYPES = [
     OrderFinancialEvents,
     ReportsStream,
     WarehouseInventory,
+    ProductsIventoryStream,
+    ProductDetails,
 ]
 
 
@@ -49,7 +50,7 @@ class TapAmazonSeller(Tap):
         th.Property(
             "report_types",
             th.CustomType({"type": ["array", "string"]}),
-            default=["GET_LEDGER_DETAIL_VIEW_DATA"],
+            default=["GET_LEDGER_DETAIL_VIEW_DATA", "GET_MERCHANT_LISTINGS_ALL_DATA"],
         ),
         th.Property(
             "processing_status",
