@@ -769,10 +769,13 @@ class ProductsIventoryStream(AmazonSellerStream):
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
-        return {
-            "ASIN": record["asin1"],
-            "marketplace_id": context.get("marketplace_id"),
-        }
+        if "asin1" in record:
+            return {
+                "ASIN": record["asin1"],
+                "marketplace_id": context.get("marketplace_id"),
+            }
+        else:
+            return []    
 
     @backoff.on_exception(
         backoff.expo,
@@ -855,9 +858,14 @@ class ProductDetails(AmazonSellerStream):
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
             asin = context.get("ASIN")
-
             catalog = self.get_sp_catalog(context.get("marketplace_id"))
-            items = catalog.get_item(asin=asin).payload
+            if context.get("marketplace_id") =='JP':
+                items = catalog.list_items(JAN=asin).payload
+                if "Items" in items:
+                    if len(items['Items'])>0:
+                        items = items['Items'][0]    
+            else:
+                items = catalog.get_item(asin=asin).payload
             items.update({"ASIN": asin})
             return [items]
         except Exception as e:

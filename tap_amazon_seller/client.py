@@ -144,11 +144,11 @@ class AmazonSellerStream(Stream):
 
         if start_date and end_date is not None:
             res = reports.create_report(
-                reportType=type, dataStartTime=start_date, dataEndTime=end_date
+                reportType=type, dataStartTime=start_date, dataEndTime=end_date,reportOptions={"custom":"true"}
             ).payload
         else:
             res = reports.create_report(
-                reportType=type, dataStartTime=start_date
+                reportType=type, dataStartTime=start_date,reportOptions={"custom":"true"}
             ).payload
         if "reportId" in res:
             self.report_id = res["reportId"]
@@ -175,6 +175,7 @@ class AmazonSellerStream(Stream):
                 data_reader = csv.DictReader(data, delimiter="\t")
                 for row in data_reader:
                     row["reportId"] = self.report_id
+                    row = self.translate_report(row)
                     finalList.append(dict(row))
             os.remove(file)
         return finalList
@@ -201,3 +202,26 @@ class AmazonSellerStream(Stream):
         return Catalog(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )
+
+    def translate_report(self,row):
+        translate = {
+            "\x8f¤\x95i\x96¼":"item-name",
+            "\x8fo\x95iID":"listing-id",
+            "\x8fo\x95i\x8eÒSKU":"seller-sku",
+            "\x89¿\x8ai":"price",
+            "\x90\x94\x97Ê":"quantity",
+            "\x8fo\x95i\x93ú":"open-date",
+            "\x8f¤\x95iID\x83^\x83C\x83v":"product-id-type",
+            "\x8f¤\x95iID":"asin1",
+        }
+        return_translated = False
+        translated = {}    
+        for key in translate.keys():
+            if key in row:
+                return_translated = True
+                translated[translate[key]] = row[key]
+        if return_translated is True:
+            return translated
+        else:
+            return row             
+
