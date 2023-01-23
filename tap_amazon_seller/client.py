@@ -144,11 +144,11 @@ class AmazonSellerStream(Stream):
 
         if start_date and end_date is not None:
             res = reports.create_report(
-                reportType=type, dataStartTime=start_date, dataEndTime=end_date,reportOptions={"custom":"true"}
+                reportType=type, dataStartTime=start_date, dataEndTime=end_date
             ).payload
         else:
             res = reports.create_report(
-                reportType=type, dataStartTime=start_date,reportOptions={"custom":"true"}
+                reportType=type, dataStartTime=start_date
             ).payload
         if "reportId" in res:
             self.report_id = res["reportId"]
