@@ -765,6 +765,8 @@ class ProductsIventoryStream(AmazonSellerStream):
         th.Property("status", th.StringType),
         th.Property("Minimum order quantity", th.StringType),
         th.Property("Sell remainder", th.StringType),
+        th.Property("product-id", th.StringType),
+        th.Property("marketplace_id", th.StringType),
     ).to_dict()
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
@@ -774,6 +776,11 @@ class ProductsIventoryStream(AmazonSellerStream):
                 "ASIN": record["asin1"],
                 "marketplace_id": context.get("marketplace_id"),
             }
+        elif "product-id" in record:
+            return {
+                "ASIN": record["product-id"],
+                "marketplace_id": context.get("marketplace_id"),
+            }    
         else:
             return []    
 
@@ -830,6 +837,8 @@ class ProductsIventoryStream(AmazonSellerStream):
             for row in items["reports"]:
                 reports = self.check_report(row["reportId"], report)
                 for report_row in reports:
+                    if context is not None:
+                        report_row.update({marketplace_id:context.get('marketplace_id')})
                     yield report_row
 
         except Exception as e:
@@ -852,21 +861,28 @@ class ProductDetails(AmazonSellerStream):
         th.Property("AttributeSets", th.CustomType({"type": ["array", "string"]})),
         th.Property("Relationships", th.CustomType({"type": ["array", "string"]})),
         th.Property("SalesRankings", th.CustomType({"type": ["array", "string"]})),
+        th.Property("marketplace_id", th.StringType),
     ).to_dict()
 
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
+            # if context is not None:
             asin = context.get("ASIN")
             catalog = self.get_sp_catalog(context.get("marketplace_id"))
             if context.get("marketplace_id") =='JP':
                 items = catalog.list_items(JAN=asin).payload
-                if "Items" in items:
-                    if len(items['Items'])>0:
-                        items = items['Items'][0]    
+            elif context.get("marketplace_id") in ['FR']:
+                items = catalog.list_items(EAN=asin).payload     
             else:
                 items = catalog.get_item(asin=asin).payload
+            if "Items" in items:
+                    if len(items['Items'])>0:
+                        items = items['Items'][0]    
             items.update({"ASIN": asin})
+            items.update({"marketplace_id": context.get("marketplace_id")})
             return [items]
+            # else:
+            #     return []    
         except Exception as e:
             raise InvalidResponse(e)
