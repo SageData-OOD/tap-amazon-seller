@@ -213,6 +213,9 @@ class AmazonSellerStream(Stream):
             "\x8fo\x95i\x93ú":"open-date",
             "\x8f¤\x95iID\x83^\x83C\x83v":"product-id-type",
             "\x8f¤\x95iID":"asin1",
+            "\x83t\x83\x8b\x83t\x83B\x83\x8b\x83\x81\x83\x93\x83g\x81E\x83`\x83\x83\x83\x93\x83l\x83\x8b":"fulfilment-channel",
+            "\x83X\x83e\x81[\x83^\x83X":"status",
+            "\x8fo\x95i\x93ú":"open-date",
         }
         return_translated = False
         translated = {}    
