@@ -166,7 +166,7 @@ class OrdersStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -197,7 +197,7 @@ class OrdersStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -326,7 +326,7 @@ class OrderItemsStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -523,7 +523,7 @@ class OrderFinancialEvents(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -583,7 +583,7 @@ class ReportsStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -663,7 +663,7 @@ class WarehouseInventory(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -695,7 +695,7 @@ class WarehouseInventory(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -786,7 +786,7 @@ class ProductsIventoryStream(AmazonSellerStream):
 
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
@@ -866,7 +866,7 @@ class ProductDetails(AmazonSellerStream):
     
     @backoff.on_exception(
         backoff.expo,
-        (Exception, InvalidResponse, SellingApiServerException),
+        (Exception),
         max_tries=10,
         factor=3,
     )
