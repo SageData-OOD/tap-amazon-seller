@@ -368,6 +368,12 @@ class OrderBuyerInfo(AmazonSellerStream):
         th.Property("PurchaseOrderNumber", th.StringType),
     ).to_dict()
 
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
