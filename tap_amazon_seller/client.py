@@ -175,6 +175,7 @@ class AmazonSellerStream(Stream):
                 data_reader = csv.DictReader(data, delimiter="\t")
                 for row in data_reader:
                     row["reportId"] = self.report_id
+                    row = self.translate_report(row)
                     finalList.append(dict(row))
             os.remove(file)
         return finalList
@@ -201,3 +202,29 @@ class AmazonSellerStream(Stream):
         return Catalog(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )
+
+    def translate_report(self,row):
+        translate = {
+            "\x8f¤\x95i\x96¼":"item-name",
+            "\x8fo\x95iID":"listing-id",
+            "\x8fo\x95i\x8eÒSKU":"seller-sku",
+            "\x89¿\x8ai":"price",
+            "\x90\x94\x97Ê":"quantity",
+            "\x8fo\x95i\x93ú":"open-date",
+            "\x8f¤\x95iID\x83^\x83C\x83v":"product-id-type",
+            "\x8f¤\x95iID":"asin1",
+            "\x83t\x83\x8b\x83t\x83B\x83\x8b\x83\x81\x83\x93\x83g\x81E\x83`\x83\x83\x83\x93\x83l\x83\x8b":"fulfilment-channel",
+            "\x83X\x83e\x81[\x83^\x83X":"status",
+            "\x8fo\x95i\x93ú":"open-date",
+        }
+        return_translated = False
+        translated = {}    
+        for key in translate.keys():
+            if key in row:
+                return_translated = True
+                translated[translate[key]] = row[key]
+        if return_translated is True:
+            return translated
+        else:
+            return row             
+
