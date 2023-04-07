@@ -4,7 +4,7 @@
 from typing import Any, List, Optional, cast
 
 from singer_sdk.streams import Stream
-from sp_api.api import Finances, Inventories, Orders, ReportsV2, Catalog
+from sp_api.api import Finances, Inventories, Orders, ReportsV2, Catalog,VendorDirectFulfillmentOrders, VendorDirectFulfillmentShipping
 from sp_api.base import Marketplaces
 import csv
 import os
@@ -228,3 +228,16 @@ class AmazonSellerStream(Stream):
         else:
             return row             
 
+    def get_sp_vendor(self, marketplace_id=None):
+            if marketplace_id is None:
+                marketplace_id = self.config.get("marketplace", "US")
+            return VendorDirectFulfillmentOrders(
+                credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+            )
+    
+    def get_sp_vendor_shipping(self, marketplace_id=None):
+            if marketplace_id is None:
+                marketplace_id = self.config.get("marketplace", "US")
+            return VendorDirectFulfillmentShipping(
+                credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+            )

@@ -17,6 +17,8 @@ from tap_amazon_seller.streams import (
     WarehouseInventory,
     ProductsIventoryStream,
     ProductDetails,
+    VendorPurchaseOrdersStream,
+    VendorCustomerInvoicesStream,
 )
 
 STREAM_TYPES = [
@@ -30,6 +32,8 @@ STREAM_TYPES = [
     WarehouseInventory,
     ProductsIventoryStream,
     ProductDetails,
+    VendorPurchaseOrdersStream,
+    VendorCustomerInvoicesStream,
 ]
 
 
