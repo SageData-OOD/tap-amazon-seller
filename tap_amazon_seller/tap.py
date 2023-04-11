@@ -61,6 +61,10 @@ class TapAmazonSeller(Tap):
             th.CustomType({"type": ["array", "string"]}),
             default=["IN_QUEUE", "IN_PROGRESS"],
         ),
+        th.Property(
+            "marketplaces",
+            th.CustomType({"type": ["array", "string"]}),
+        ),
     ).to_dict()
 
     def discover_streams(self) -> List[Stream]:
