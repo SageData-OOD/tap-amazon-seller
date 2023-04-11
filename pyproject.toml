@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tap-amazon-seller"
-version = "0.0.24"
+version = "0.1.1"
 description = "`tap-amazon-seller` is a Singer tap for Amazon-Seller, built with the Meltano SDK for Singer Taps."
 authors = ["Adil Ahmed"]
 keywords = [
@@ -13,7 +13,7 @@ license = "Apache 2.0"
 python = "<3.11,>=3.7.1"
 requests = "^2.25.1"
 singer-sdk = "^0.4.4"
-python-amazon-sp-api = "^0.17.3"
+python-amazon-sp-api = "^0.18.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"

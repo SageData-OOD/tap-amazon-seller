@@ -440,7 +440,7 @@ class OrderFinancialEvents(AmazonSellerStream):
     """Define custom stream."""
 
     name = "orderfinancialevents"
-    primary_keys = []
+    primary_keys = ["AmazonOrderId"]
     replication_key = None
     order_id = "{AmazonOrderId}"
     parent_stream_type = OrdersStream
@@ -740,7 +740,7 @@ class ProductsIventoryStream(AmazonSellerStream):
     """Define custom stream."""
 
     name = "products_inventory"
-    primary_keys = ["reportId"]
+    primary_keys = ["listing-id"]
     replication_key = None
     report_id = None
     document_id = None
@@ -861,7 +861,7 @@ class ProductDetails(AmazonSellerStream):
     """Define custom stream."""
 
     name = "product_details"
-    primary_keys = None
+    primary_keys = ["ASIN"]
     replication_key = None
     asin = "{ASIN}"
     parent_stream_type = ProductsIventoryStream
@@ -902,5 +902,186 @@ class ProductDetails(AmazonSellerStream):
             return [items]
             # else:
             #     return []    
+        except Exception as e:
+            raise InvalidResponse(e)
+
+class VendorPurchaseOrdersStream(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "vendpr_purchase_orders"
+    primary_keys = ["purchaseOrderNumber"]
+    #TODO loook for relevant replication key in the live data
+    replication_key = None
+    parent_stream_type = MarketplacesStream
+    marketplace_id = "{marketplace_id}"
+
+    schema = th.PropertiesList(
+        th.Property("purchaseOrderNumber", th.StringType),
+        #Optional, not always populated
+        th.Property("orderDetails", th.ObjectType(
+            th.Property("customerOrderNumber", th.StringType),
+            th.Property("orderDate", th.DateTimeType),
+            th.Property("orderStatus", th.StringType),
+            th.Property("shipmentDetails", th.CustomType({"type": ["object", "string"]})),
+            th.Property("taxTotal", th.CustomType({"type": ["object", "string"]})),
+            th.Property("sellingParty", th.CustomType({"type": ["object", "string"]})),
+            th.Property("shipToParty", th.CustomType({"type": ["object", "string"]})),
+            th.Property("billToParty", th.CustomType({"type": ["object", "string"]})),
+            th.Property("items", th.CustomType({"type": ["array", "string"]})),
+        )),
+    
+    ).to_dict()
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    @timeout(15)
+    @load_all_pages()
+    def load_all_orders(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+        try:
+            orders = self.get_sp_vendor(mp)
+            orders_obj = orders.get_orders(**kwargs)
+            return orders_obj
+        except Exception as e:
+            raise InvalidResponse(e)
+
+    def load_order_page(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+
+        for page in self.load_all_orders(mp, **kwargs):
+            orders = []
+            for order in page.payload.get("Orders"):
+                orders.append(order)
+
+            yield orders
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+            # Get start_date
+            start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
+            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+            if self.config.get("end_date"):
+                end_date = datetime.strptime(
+                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            else:
+                #End date required by the endpoint
+                end_date = datetime.strptime(
+                    datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )    
+
+            sandbox = self.config.get("sandbox", False)
+            if sandbox is True:
+                return self.load_order_page(
+                    mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
+                )
+            else:
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"),createdBefore=end_date,createdAfter=start_date
+                )
+            for row in rows:
+                for item in row:
+                    yield item
+        except Exception as e:
+            raise InvalidResponse(e)
+
+class VendorCustomerInvoicesStream(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "vendpr_customer_invoices"
+    primary_keys = ["purchaseOrderNumber"]
+    #TODO loook for relevant key in live data
+    replication_key = None
+    parent_stream_type = MarketplacesStream
+    marketplace_id = "{marketplace_id}"
+
+    schema = th.PropertiesList(
+        th.Property("purchaseOrderNumber", th.StringType),
+        th.Property("content", th.StringType),
+        th.Property("sellingParty", th.CustomType({"type": ["object", "string"]})),
+        th.Property("shipFromParty", th.CustomType({"type": ["object", "string"]})),
+        th.Property("labelFormat", th.CustomType({"type": ["object", "string"]})),
+        th.Property("labelData", th.CustomType({"type": ["array", "string"]})),
+    
+    ).to_dict()
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    @timeout(15)
+    @load_all_pages()
+    def load_all_orders(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+        try:
+            vendor_shipping = self.get_sp_vendor_shipping(mp)
+            invoices_obj = vendor_shipping.get_orders(**kwargs)
+            return invoices_obj
+        except Exception as e:
+            raise InvalidResponse(e)
+
+    def load_order_page(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+
+        for page in self.load_all_orders(mp, **kwargs):
+            orders = []
+            for order in page.payload.get("shippingLabels"):
+                orders.append(order)
+
+            yield orders
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+            # Get start_date
+            start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
+            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+            if self.config.get("end_date"):
+                end_date = datetime.strptime(
+                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            else:
+                #End date required by the endpoint
+                end_date = datetime.strptime(
+                    datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )    
+
+            sandbox = self.config.get("sandbox", False)
+            if sandbox is True:
+                return self.load_order_page(
+                    mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
+                )
+            else:
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"),createdBefore=end_date,createdAfter=start_date
+                )
+            for row in rows:
+                for item in row:
+                    yield item
         except Exception as e:
             raise InvalidResponse(e)
