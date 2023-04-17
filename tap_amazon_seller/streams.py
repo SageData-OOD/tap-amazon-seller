@@ -908,10 +908,10 @@ class ProductDetails(AmazonSellerStream):
         except Exception as e:
             raise InvalidResponse(e)
 
-class VendorPurchaseOrdersStream(AmazonSellerStream):
+class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
     """Define custom stream."""
 
-    name = "vendpr_purchase_orders"
+    name = "vendor_fulfilment_purchase_orders"
     primary_keys = ["purchaseOrderNumber"]
     #TODO loook for relevant replication key in the live data
     replication_key = None
@@ -948,7 +948,7 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
         a generator function to return all pages, obtained by NextToken
         """
         try:
-            orders = self.get_sp_vendor(mp)
+            orders = self.get_sp_vendor_fulfilment(mp)
             orders_obj = orders.get_orders(**kwargs)
             return orders_obj
         except Exception as e:
@@ -983,9 +983,8 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
                 )
             else:
                 #End date required by the endpoint
-                end_date = datetime.strptime(
-                    datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )    
+                end_date =datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ") 
+  
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
@@ -1002,10 +1001,10 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
         except Exception as e:
             raise InvalidResponse(e)
 
-class VendorCustomerInvoicesStream(AmazonSellerStream):
+class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
     """Define custom stream."""
 
-    name = "vendpr_customer_invoices"
+    name = "vendor_fulfilment_customer_invoices"
     primary_keys = ["purchaseOrderNumber"]
     #TODO loook for relevant key in live data
     replication_key = None
@@ -1035,7 +1034,7 @@ class VendorCustomerInvoicesStream(AmazonSellerStream):
         a generator function to return all pages, obtained by NextToken
         """
         try:
-            vendor_shipping = self.get_sp_vendor_shipping(mp)
+            vendor_shipping = self.get_sp_vendor_fulfilment_shipping(mp)
             invoices_obj = vendor_shipping.get_orders(**kwargs)
             return invoices_obj
         except Exception as e:
@@ -1070,9 +1069,8 @@ class VendorCustomerInvoicesStream(AmazonSellerStream):
                 )
             else:
                 #End date required by the endpoint
-                end_date = datetime.strptime(
-                    datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )    
+                end_date =datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ") 
+ 
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
@@ -1088,3 +1086,89 @@ class VendorCustomerInvoicesStream(AmazonSellerStream):
                     yield item
         except Exception as e:
             raise InvalidResponse(e)
+
+class VendorPurchaseOrdersStream(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "vendor_purchase_orders"
+    primary_keys = ["purchaseOrderNumber"]
+    #TODO loook for relevant replication key in the live data
+    replication_key = None
+    parent_stream_type = MarketplacesStream
+    marketplace_id = "{marketplace_id}"
+
+    schema = th.PropertiesList(
+        th.Property("purchaseOrderNumber", th.StringType),
+        th.Property("purchaseOrderState", th.StringType),
+        #Optional, not always populated
+        th.Property("orderDetails", th.CustomType({"type": ["object", "string"]})),
+        th.Property("deliveryWindow", th.StringType),
+        th.Property("items", th.CustomType({"type": ["array", "string"]})),
+    
+    ).to_dict()
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    @timeout(15)
+    @load_all_pages()
+    def load_all_orders(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+        try:
+            orders = self.get_sp_vendor(mp)
+            orders_obj = orders.get_purchase_orders(**kwargs)
+            return orders_obj
+        except Exception as e:
+            raise InvalidResponse(e)
+
+    def load_order_page(self, mp, **kwargs):
+        """
+        a generator function to return all pages, obtained by NextToken
+        """
+
+        for page in self.load_all_orders(mp, **kwargs):
+            orders = []
+            for order in page.payload.get("Orders"):
+                orders.append(order)
+
+            yield orders
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+            # Get start_date
+            start_date = self.get_starting_timestamp(context) or datetime.today()
+            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+            if self.config.get("end_date"):
+                end_date = datetime.strptime(
+                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            else:
+                #End date required by the endpoint
+                end_date =datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ") 
+  
+
+            sandbox = self.config.get("sandbox", False)
+            if sandbox is True:
+                return self.load_order_page(
+                    mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
+                )
+            else:
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"),createdAfter=start_date,limit=100, SortOrder = "DESC"
+                )
+            for row in rows:
+                for item in row:
+                    yield item
+        except Exception as e:
+            raise InvalidResponse(e)        
