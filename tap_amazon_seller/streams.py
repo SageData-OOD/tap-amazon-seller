@@ -1171,4 +1171,101 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
                 for item in row:
                     yield item
         except Exception as e:
-            raise InvalidResponse(e)        
+            raise InvalidResponse(e)  
+
+class AFNInventoryCountryStream(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "afn_inventory_country"
+    primary_keys = None
+    replication_key = None
+    report_id = None
+    document_id = None
+    parent_stream_type = MarketplacesStream
+    schema = th.PropertiesList(
+        th.Property("seller-sku", th.StringType),
+        th.Property("fulfillment-channel-sku", th.StringType),
+        th.Property("asin", th.StringType),
+        th.Property("condition-type", th.StringType),
+        th.Property("country", th.StringType),
+        th.Property("quantity-for-local-fulfillment", th.StringType),
+    ).to_dict()
+
+    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
+        """Return a context dictionary for child streams."""
+        if "asin1" in record:
+            return {
+                "ASIN": record["asin1"],
+                "marketplace_id": context.get("marketplace_id"),
+            }
+        elif "product-id" in record:
+            return {
+                "ASIN": record["product-id"],
+                "marketplace_id": context.get("marketplace_id"),
+            }    
+        else:
+            return []    
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    @timeout(15)
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+            eu_marketplaces = [    
+                "ES",
+                "GB",
+                "FR",
+                "NL",
+                "DE",
+                "IT",
+                "SE",
+                "PL",
+                "EG",
+                "TR",
+                "SA",
+                "AE",
+                "IN",
+                ]
+            start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
+            end_date = None
+            if self.config.get("start_date"):
+                start_date = datetime.strptime(
+                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            
+            start_date = start_date.strftime("%Y-%m-%dT00:00:00")
+            report_types = ["GET_AFN_INVENTORY_DATA_BY_COUNTRY"]
+            processing_status = self.config.get("processing_status")
+            marketplace_id = None
+            if context is not None:
+                marketplace_id = context.get("marketplace_id")
+            if marketplace_id in eu_marketplaces:
+                report = self.get_sp_reports(marketplace_id=marketplace_id)
+                
+                items = report.get_reports(
+                    reportTypes=report_types,
+                    processingStatuses=processing_status,
+                    dataStartTime=start_date,
+                ).payload
+
+                if not items["reports"]:
+                    reports = self.create_report(
+                        start_date, report, end_date, "GET_AFN_INVENTORY_DATA_BY_COUNTRY"
+                    )
+                    for row in reports:
+                        yield row
+
+                # If reports are form loop through, download documents and populate the data.txt
+                for row in items["reports"]:
+                    reports = self.check_report(row["reportId"], report)
+                    for report_row in reports:
+                        if context is not None:
+                            report_row.update({marketplace_id:context.get('marketplace_id')})
+                        yield report_row
+
+        except Exception as e:
+            raise InvalidResponse(e)              
