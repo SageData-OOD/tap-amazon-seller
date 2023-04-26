@@ -13,6 +13,7 @@ from dateutil.relativedelta import relativedelta
 from sp_api.base import Marketplaces
 
 
+
 class MarketplacesStream(AmazonSellerStream):
     """Define custom stream."""
 
@@ -1181,7 +1182,6 @@ class AFNInventoryCountryStream(AmazonSellerStream):
     replication_key = None
     report_id = None
     document_id = None
-    parent_stream_type = MarketplacesStream
     schema = th.PropertiesList(
         th.Property("seller-sku", th.StringType),
         th.Property("fulfillment-channel-sku", th.StringType),
@@ -1212,11 +1212,11 @@ class AFNInventoryCountryStream(AmazonSellerStream):
         max_tries=10,
         factor=3,
     )
-    @timeout(15)
+    # @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
+            #Leaving it here for EU marketplaces reference. 
             eu_marketplaces = [    
-                "ES",
                 "GB",
                 "FR",
                 "NL",
@@ -1240,32 +1240,32 @@ class AFNInventoryCountryStream(AmazonSellerStream):
             start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = ["GET_AFN_INVENTORY_DATA_BY_COUNTRY"]
             processing_status = self.config.get("processing_status")
-            marketplace_id = None
-            if context is not None:
-                marketplace_id = context.get("marketplace_id")
-            if marketplace_id in eu_marketplaces:
-                report = self.get_sp_reports(marketplace_id=marketplace_id)
-                
-                items = report.get_reports(
-                    reportTypes=report_types,
-                    processingStatuses=processing_status,
-                    dataStartTime=start_date,
-                ).payload
+            #Initiate credentials object using ES European marketplace id. 
+            marketplace_id = "ES"
+           
+            
+            report = self.get_sp_reports(marketplace_id=marketplace_id)
+            
+            items = report.get_reports(
+                reportTypes=report_types,
+                processingStatuses=processing_status,
+                dataStartTime=start_date,
+            ).payload
 
-                if not items["reports"]:
-                    reports = self.create_report(
-                        start_date, report, end_date, "GET_AFN_INVENTORY_DATA_BY_COUNTRY"
-                    )
-                    for row in reports:
-                        yield row
+            if not items["reports"]:
+                reports = self.create_report(
+                    start_date, report, end_date, "GET_AFN_INVENTORY_DATA_BY_COUNTRY"
+                )
+                for row in reports:
+                    yield row
 
-                # If reports are form loop through, download documents and populate the data.txt
-                for row in items["reports"]:
-                    reports = self.check_report(row["reportId"], report)
-                    for report_row in reports:
-                        if context is not None:
-                            report_row.update({marketplace_id:context.get('marketplace_id')})
-                        yield report_row
+            # If reports are form loop through, download documents and populate the data.txt
+            for row in items["reports"]:
+                reports = self.check_report(row["reportId"], report)
+                for report_row in reports:
+                    if context is not None:
+                        report_row.update({marketplace_id:context.get('marketplace_id')})
+                    yield report_row
 
         except Exception as e:
             raise InvalidResponse(e)              
