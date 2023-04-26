@@ -9,6 +9,7 @@ from sp_api.base import Marketplaces
 import csv
 import os
 import time
+from tap_amazon_seller.utils import InvalidResponse
 
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
@@ -137,22 +138,24 @@ class AmazonSellerStream(Stream):
         return Inventories(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )
-
+ 
     def create_report(
         self, start_date, reports, end_date=None, type="GET_LEDGER_DETAIL_VIEW_DATA"
     ):
-
-        if start_date and end_date is not None:
-            res = reports.create_report(
-                reportType=type, dataStartTime=start_date, dataEndTime=end_date
-            ).payload
-        else:
-            res = reports.create_report(
-                reportType=type, dataStartTime=start_date
-            ).payload
-        if "reportId" in res:
-            self.report_id = res["reportId"]
-            return self.check_report(res["reportId"], reports)
+        try:
+            if start_date and end_date is not None:
+                res = reports.create_report(
+                    reportType=type, dataStartTime=start_date, dataEndTime=end_date
+                ).payload
+            else:
+                res = reports.create_report(
+                    reportType=type, dataStartTime=start_date
+                ).payload
+            if "reportId" in res:
+                self.report_id = res["reportId"]
+                return self.check_report(res["reportId"], reports)
+        except Exception as e:
+            raise InvalidResponse(e)    
 
     def get_report(self, report_id, reports):
         return reports.get_report(report_id)
@@ -190,6 +193,9 @@ class AmazonSellerStream(Stream):
                 # save the document
                 self.save_document(document_id, reports)
                 res = self.read_csv(f"./{document_id}_document.csv")
+                break
+            elif report["processingStatus"] == "FATAL":
+                self.logger.warning(f"Report {report_id} failed with FATAL status. Skipping...")
                 break
             else:
                 time.sleep(30)
