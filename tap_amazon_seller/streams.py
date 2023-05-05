@@ -1216,13 +1216,17 @@ class AFNInventoryCountryStream(AmazonSellerStream):
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
             #Leaving it here for EU marketplaces reference. 
-            eu_marketplaces = [    
+            eu_marketplaces = [
+                "ES",    
+                "UK",    
+                "BE",    
                 "GB",
                 "FR",
                 "NL",
                 "DE",
                 "IT",
                 "SE",
+                "ZA",
                 "PL",
                 "EG",
                 "TR",
@@ -1240,32 +1244,36 @@ class AFNInventoryCountryStream(AmazonSellerStream):
             start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = ["GET_AFN_INVENTORY_DATA_BY_COUNTRY"]
             processing_status = self.config.get("processing_status")
-            #Initiate credentials object using ES European marketplace id. 
-            marketplace_id = "ES"
+            #Get list of valid marketplaces
+            marketplaces = self.get_valid_marketplaces()
+            common_marketplaces = list(set(marketplaces).intersection(eu_marketplaces))
+            marketplace_id = None
+            if len(common_marketplaces)>0:
+                marketplace_id = common_marketplaces[0]
            
-            
-            report = self.get_sp_reports(marketplace_id=marketplace_id)
-            
-            items = report.get_reports(
-                reportTypes=report_types,
-                processingStatuses=processing_status,
-                dataStartTime=start_date,
-            ).payload
+            if marketplace_id in eu_marketplaces:
+                report = self.get_sp_reports(marketplace_id=marketplace_id)
+                
+                items = report.get_reports(
+                    reportTypes=report_types,
+                    processingStatuses=processing_status,
+                    dataStartTime=start_date,
+                ).payload
 
-            if not items["reports"]:
-                reports = self.create_report(
-                    start_date, report, end_date, "GET_AFN_INVENTORY_DATA_BY_COUNTRY"
-                )
-                for row in reports:
-                    yield row
+                if not items["reports"]:
+                    reports = self.create_report(
+                        start_date, report, end_date, "GET_AFN_INVENTORY_DATA_BY_COUNTRY"
+                    )
+                    for row in reports:
+                        yield row
 
-            # If reports are form loop through, download documents and populate the data.txt
-            for row in items["reports"]:
-                reports = self.check_report(row["reportId"], report)
-                for report_row in reports:
-                    if context is not None:
-                        report_row.update({marketplace_id:context.get('marketplace_id')})
-                    yield report_row
+                # If reports are form loop through, download documents and populate the data.txt
+                for row in items["reports"]:
+                    reports = self.check_report(row["reportId"], report)
+                    for report_row in reports:
+                        if context is not None:
+                            report_row.update({marketplace_id:context.get('marketplace_id')})
+                        yield report_row
 
         except Exception as e:
             raise InvalidResponse(e)              
