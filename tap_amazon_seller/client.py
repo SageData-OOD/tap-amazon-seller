@@ -10,6 +10,7 @@ import csv
 import os
 import time
 from tap_amazon_seller.utils import InvalidResponse
+from datetime import datetime
 
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
@@ -254,3 +255,42 @@ class AmazonSellerStream(Stream):
             return VendorOrders(
                 credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
             )
+    def get_valid_marketplaces(self,today_date=None):
+        marketplaces_valid = []
+        if self.config.get("marketplaces"):
+            marketplaces = self.config.get("marketplaces")
+        else:
+            marketplaces = [
+                "US",
+                "CA",
+                "MX",
+                "BR",
+                "ES",
+                "GB",
+                "FR",
+                "NL",
+                "DE",
+                "IT",
+                "SE",
+                "PL",
+                "EG",
+                "TR",
+                "SA",
+                "AE",
+                "IN",
+                "SG",
+                "AU",
+                "JP",
+            ]
+        # orders = self.get_sp_orders()
+        # Fetch minimum number of orders and verify credentials are working
+        if today_date is None:
+            today_date = datetime.today().strftime("%Y-%m-%d")
+        for mp in marketplaces:
+            try:
+                orders = self.get_sp_orders(mp)
+                allorders = orders.get_orders(CreatedAfter=today_date)
+                marketplaces_valid.append(mp)
+            except:
+                output = f"marketplace {mp} not part of current SP account"
+        return marketplaces_valid        
