@@ -1297,7 +1297,7 @@ class SalesTrafficReportStream(AmazonSellerStream):
         backoff.expo,
         (Exception),
         max_tries=10,
-        factor=3,
+        factor=5,
     )
     # @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
