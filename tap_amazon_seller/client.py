@@ -12,6 +12,7 @@ import time
 from tap_amazon_seller.utils import InvalidResponse
 from datetime import datetime
 import json
+import backoff
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
 
@@ -139,7 +140,12 @@ class AmazonSellerStream(Stream):
         return Inventories(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )
- 
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=5,
+    )
     def create_report(
         self, start_date, reports, end_date=None, type="GET_LEDGER_DETAIL_VIEW_DATA",report_format_type="csv"
     ):
@@ -157,19 +163,37 @@ class AmazonSellerStream(Stream):
                 return self.check_report(res["reportId"], reports,report_format_type)
         except Exception as e:
             raise InvalidResponse(e)    
-
+        
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=5,
+    )
     def get_report(self, report_id, reports):
-        return reports.get_report(report_id)
-
+        try:
+            return reports.get_report(report_id)
+        except Exception as e:
+            raise InvalidResponse(e)
+    
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=5,
+    )
     def save_document(self, document_id, reports,report_type="csv"):
-        res = reports.get_report_document(
-            document_id,
-            decrypt=True,
-            file=f"{ROOT_DIR}/{document_id}_document.{report_type}",
-            download=True,
-        )
-        self.reportDocumentId = document_id
-        return res
+        try:
+            res = reports.get_report_document(
+                document_id,
+                decrypt=True,
+                file=f"{ROOT_DIR}/{document_id}_document.{report_type}",
+                download=True,
+            )
+            self.reportDocumentId = document_id
+            return res
+        except Exception as e:
+            raise InvalidResponse(e)
 
     def read_csv(self, file):
         finalList = []
