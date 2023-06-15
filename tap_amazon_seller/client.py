@@ -4,7 +4,16 @@
 from typing import Any, List, Optional, cast
 
 from singer_sdk.streams import Stream
-from sp_api.api import Finances, Inventories, Orders, ReportsV2, Catalog,VendorDirectFulfillmentOrders, VendorDirectFulfillmentShipping, VendorOrders
+from sp_api.api import (
+    Finances,
+    Inventories,
+    Orders,
+    ReportsV2,
+    Catalog,
+    VendorDirectFulfillmentOrders,
+    VendorDirectFulfillmentShipping,
+    VendorOrders,
+)
 from sp_api.base import Marketplaces
 import csv
 import os
@@ -13,6 +22,7 @@ from tap_amazon_seller.utils import InvalidResponse
 from datetime import datetime
 import json
 import backoff
+
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
 
@@ -42,7 +52,6 @@ def get_state_if_exists(
     state_partition_context: Optional[dict] = None,
     key: Optional[str] = None,
 ) -> Optional[Any]:
-
     if "bookmarks" not in tap_state:
         return None
     if tap_stream_id not in tap_state["bookmarks"]:
@@ -140,6 +149,7 @@ class AmazonSellerStream(Stream):
         return Inventories(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )
+
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -147,12 +157,19 @@ class AmazonSellerStream(Stream):
         factor=5,
     )
     def create_report(
-        self, start_date, reports, end_date=None, type="GET_LEDGER_DETAIL_VIEW_DATA",report_format_type="csv"
+        self,
+        start_date,
+        reports,
+        end_date=None,
+        type="GET_LEDGER_DETAIL_VIEW_DATA",
+        report_format_type="csv",
     ):
         try:
             if start_date and end_date is not None:
                 res = reports.create_report(
-                    reportType=type, dataStartTime=start_date, dataEndTime=end_date,
+                    reportType=type,
+                    dataStartTime=start_date,
+                    dataEndTime=end_date,
                 ).payload
             else:
                 res = reports.create_report(
@@ -160,10 +177,10 @@ class AmazonSellerStream(Stream):
                 ).payload
             if "reportId" in res:
                 self.report_id = res["reportId"]
-                return self.check_report(res["reportId"], reports,report_format_type)
+                return self.check_report(res["reportId"], reports, report_format_type)
         except Exception as e:
-            raise InvalidResponse(e)    
-        
+            raise InvalidResponse(e)
+
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -175,14 +192,14 @@ class AmazonSellerStream(Stream):
             return reports.get_report(report_id)
         except Exception as e:
             raise InvalidResponse(e)
-    
+
     @backoff.on_exception(
         backoff.expo,
         (Exception),
         max_tries=10,
         factor=5,
     )
-    def save_document(self, document_id, reports,report_type="csv"):
+    def save_document(self, document_id, reports, report_type="csv"):
         try:
             res = reports.get_report_document(
                 document_id,
@@ -207,7 +224,7 @@ class AmazonSellerStream(Stream):
                     finalList.append(dict(row))
             os.remove(file)
         return finalList
-    
+
     def read_json(self, file):
         finalList = []
         file = f"{ROOT_DIR}/{file}"
@@ -218,7 +235,7 @@ class AmazonSellerStream(Stream):
             os.remove(file)
         return finalList
 
-    def check_report(self, report_id, reports,report_type="csv"):
+    def check_report(self, report_id, reports, report_type="csv"):
         res = []
         while True:
             report = self.get_report(report_id, reports).payload
@@ -226,14 +243,16 @@ class AmazonSellerStream(Stream):
             if report["processingStatus"] == "DONE":
                 document_id = report["reportDocumentId"]
                 # save the document
-                self.save_document(document_id, reports,report_type)
-                if report_type =="csv":
+                self.save_document(document_id, reports, report_type)
+                if report_type == "csv":
                     res = self.read_csv(f"./{document_id}_document.{report_type}")
                 else:
-                    res  = self.read_json((f"./{document_id}_document.{report_type}")) 
+                    res = self.read_json((f"./{document_id}_document.{report_type}"))
                 break
-            elif report["processingStatus"] in ["FATAL","CANCELLED"]:
-                self.logger.warning(f"Report {report_id} failed with {report.get('processingStatus')} status. Skipping...")
+            elif report["processingStatus"] in ["FATAL", "CANCELLED"]:
+                self.logger.warning(
+                    f"Report {report_id} failed with {report.get('processingStatus')} status. Skipping..."
+                )
                 break
             else:
                 time.sleep(30)
@@ -247,22 +266,22 @@ class AmazonSellerStream(Stream):
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )
 
-    def translate_report(self,row):
+    def translate_report(self, row):
         translate = {
-            "\x8f¤\x95i\x96¼":"item-name",
-            "\x8fo\x95iID":"listing-id",
-            "\x8fo\x95i\x8eÒSKU":"seller-sku",
-            "\x89¿\x8ai":"price",
-            "\x90\x94\x97Ê":"quantity",
-            "\x8fo\x95i\x93ú":"open-date",
-            "\x8f¤\x95iID\x83^\x83C\x83v":"product-id-type",
-            "\x8f¤\x95iID":"asin1",
-            "\x83t\x83\x8b\x83t\x83B\x83\x8b\x83\x81\x83\x93\x83g\x81E\x83`\x83\x83\x83\x93\x83l\x83\x8b":"fulfilment-channel",
-            "\x83X\x83e\x81[\x83^\x83X":"status",
-            "\x8fo\x95i\x93ú":"open-date",
+            "\x8f¤\x95i\x96¼": "item-name",
+            "\x8fo\x95iID": "listing-id",
+            "\x8fo\x95i\x8eÒSKU": "seller-sku",
+            "\x89¿\x8ai": "price",
+            "\x90\x94\x97Ê": "quantity",
+            "\x8fo\x95i\x93ú": "open-date",
+            "\x8f¤\x95iID\x83^\x83C\x83v": "product-id-type",
+            "\x8f¤\x95iID": "asin1",
+            "\x83t\x83\x8b\x83t\x83B\x83\x8b\x83\x81\x83\x93\x83g\x81E\x83`\x83\x83\x83\x93\x83l\x83\x8b": "fulfilment-channel",
+            "\x83X\x83e\x81[\x83^\x83X": "status",
+            "\x8fo\x95i\x93ú": "open-date",
         }
         return_translated = False
-        translated = {}    
+        translated = {}
         for key in translate.keys():
             if key in row:
                 return_translated = True
@@ -270,29 +289,30 @@ class AmazonSellerStream(Stream):
         if return_translated is True:
             return translated
         else:
-            return row             
+            return row
 
     def get_sp_vendor_fulfilment(self, marketplace_id=None):
-            if marketplace_id is None:
-                marketplace_id = self.config.get("marketplace", "US")
-            return VendorDirectFulfillmentOrders(
-                credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
-            )
-    
+        if marketplace_id is None:
+            marketplace_id = self.config.get("marketplace", "US")
+        return VendorDirectFulfillmentOrders(
+            credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+        )
+
     def get_sp_vendor_fulfilment_shipping(self, marketplace_id=None):
-            if marketplace_id is None:
-                marketplace_id = self.config.get("marketplace", "US")
-            return VendorDirectFulfillmentShipping(
-                credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
-            )
-    
+        if marketplace_id is None:
+            marketplace_id = self.config.get("marketplace", "US")
+        return VendorDirectFulfillmentShipping(
+            credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+        )
+
     def get_sp_vendor(self, marketplace_id=None):
-            if marketplace_id is None:
-                marketplace_id = self.config.get("marketplace", "US")
-            return VendorOrders(
-                credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
-            )
-    def get_valid_marketplaces(self,today_date=None):
+        if marketplace_id is None:
+            marketplace_id = self.config.get("marketplace", "US")
+        return VendorOrders(
+            credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+        )
+
+    def get_valid_marketplaces(self, today_date=None):
         marketplaces_valid = []
         if self.config.get("marketplaces"):
             marketplaces = self.config.get("marketplaces")
@@ -330,4 +350,20 @@ class AmazonSellerStream(Stream):
                 marketplaces_valid.append(mp)
             except:
                 output = f"marketplace {mp} not part of current SP account"
-        return marketplaces_valid        
+        return marketplaces_valid
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=5,
+    )
+    def get_reports_list(
+        self, reports, report_types, processing_status, start_date_f, end_date_f
+    ):
+        return reports.get_reports(
+            reportTypes=report_types,
+            processingStatuses=processing_status,
+            dataStartTime=start_date_f,
+            dataEndTime=end_date_f,
+        ).payload
