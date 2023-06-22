@@ -8,7 +8,6 @@ from sp_api.api import (
     Finances,
     Inventories,
     Orders,
-    ReportsV2,
     Catalog,
     VendorDirectFulfillmentOrders,
     VendorDirectFulfillmentShipping,
@@ -22,6 +21,7 @@ from tap_amazon_seller.utils import InvalidResponse
 from datetime import datetime
 import json
 import backoff
+from tap_amazon_seller.reportsv3 import ReportsV3
 
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
@@ -139,7 +139,7 @@ class AmazonSellerStream(Stream):
     ):
         if marketplace_id is None:
             marketplace_id = self.config.get("marketplace", "US")
-        return ReportsV2(
+        return ReportsV3(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )
 

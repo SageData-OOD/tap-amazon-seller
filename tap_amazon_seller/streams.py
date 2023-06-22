@@ -1363,7 +1363,9 @@ class SalesTrafficReportStream(AmazonSellerStream):
             while start_date <= current_date:
                 start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
                 end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
-                items = self.get_reports_list(report,report_types,processing_status,start_date_f,end_date_f)
+                items = self.get_reports_list(
+                    report, report_types, processing_status, start_date_f, end_date_f
+                )
 
                 if not items["reports"]:
                     reports = self.create_report(
