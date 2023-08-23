@@ -69,8 +69,15 @@ class MarketplacesStream(AmazonSellerStream):
         for mp in marketplaces:
             try:
                 orders = self.get_sp_orders(mp)
-                allorders = orders.get_orders(CreatedAfter=today_date)
+                sandbox = self.config.get("sandbox", False)
+                if sandbox is True:
+                    allorders = orders.get_orders(CreatedAfter="TEST_CASE_200")
+                else:    
+                    allorders = orders.get_orders(CreatedAfter=today_date)
                 yield {"id": mp}
+                if sandbox is True:
+                    #Since all sandbox orders are same and we found a valid marketplace. Break the loop.
+                    break
             except:
                 output = f"marketplace {mp} not part of current SP account"
 
@@ -212,8 +219,9 @@ class OrdersStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                return self.load_order_page(
-                    mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
+                rows =  self.load_order_page(
+                    mp=context.get("marketplace_id"),
+                    CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
@@ -1000,8 +1008,9 @@ class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                return self.load_order_page(
-                    mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
+                rows =  self.load_order_page(
+                    mp=context.get("marketplace_id"),
+                    CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
@@ -1087,8 +1096,9 @@ class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                return self.load_order_page(
-                    mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
+                rows =  self.load_order_page(
+                    mp=context.get("marketplace_id"),
+                    CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
@@ -1174,8 +1184,9 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                return self.load_order_page(
-                    mp="ATVPDKIKX0DER", CreatedAfter="TEST_CASE_200"
+                rows =  self.load_order_page(
+                    mp=context.get("marketplace_id"),
+                    CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
