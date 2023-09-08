@@ -11,7 +11,7 @@ from tap_amazon_seller.utils import InvalidResponse, timeout
 from sp_api.base.exceptions import SellingApiServerException
 from dateutil.relativedelta import relativedelta
 from sp_api.base import Marketplaces
-
+from dateutil.parser import parse
 
 class MarketplacesStream(AmazonSellerStream):
     """Define custom stream."""
@@ -819,13 +819,10 @@ class ProductsIventoryStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
             end_date = None
             if self.config.get("start_date"):
-                start_date = datetime.strptime(
-                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                start_date = parse(self.config.get("start_date")) 
             if self.config.get("end_date"):
-                end_date = datetime.strptime(
-                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                end_date = parse(self.config.get("end_date"))
+                
             start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = ["GET_MERCHANT_LISTINGS_ALL_DATA"]
             processing_status = self.config.get("processing_status")
