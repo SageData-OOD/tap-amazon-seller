@@ -268,6 +268,7 @@ class AmazonSellerStream(Stream):
 
     def translate_report(self, row):
         translate = {
+            #Japanese
             "\x8f¤\x95i\x96¼": "item-name",
             "\x8fo\x95iID": "listing-id",
             "\x8fo\x95i\x8eÒSKU": "seller-sku",
@@ -279,6 +280,27 @@ class AmazonSellerStream(Stream):
             "\x83t\x83\x8b\x83t\x83B\x83\x8b\x83\x81\x83\x93\x83g\x81E\x83`\x83\x83\x83\x93\x83l\x83\x8b": "fulfilment-channel",
             "\x83X\x83e\x81[\x83^\x83X": "status",
             "\x8fo\x95i\x93ú": "open-date",
+            #German
+            "Artikelbezeichnung": "item-name",
+            "Artikelbeschreibung":"item-description",
+            "Angebotsnummer":"listing-id",
+            "Händler-SKU":"seller-sku",
+            "Preis":"price",
+            "Menge":"quantity",
+            "Artikel ist Marketplace-Angebot":"item-is-marketplace",
+            "Produkt-ID-Typ":"product-id-type",
+            "Anmerkung zum Artikel":"item-note",
+            "Artikelzustand":"item-condition",
+            "ASIN 1":"asin1",
+            "Internationaler Versand":"will-ship-internationally",
+            "Produkt-ID":"product-id",
+            "hinzufügen-löschen":"add-delete",
+            "Anzahl Bestellungen":"pending-quantity",
+            "Versender":"fulfilment-channel",
+            "Händlerversandgruppe":"merchant-shipping-group",
+            "Status":"status",
+            "Mindestbestellmenge":"Minimum order quantity",
+            "Restposten verkaufen":"Sell remainder",
         }
         return_translated = False
         translated = {}
