@@ -742,7 +742,8 @@ class WarehouseInventory(AmazonSellerStream):
                                 yield return_row
                     else:
                         return_row.update({"lastUpdatedTime": ""})
-                yield return_row
+                else:        
+                    yield return_row
         except Exception as e:
             raise InvalidResponse(e)
 
