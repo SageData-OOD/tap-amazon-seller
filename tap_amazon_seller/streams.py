@@ -13,6 +13,7 @@ from dateutil.relativedelta import relativedelta
 from sp_api.base import Marketplaces
 from dateutil.parser import parse
 
+
 class MarketplacesStream(AmazonSellerStream):
     """Define custom stream."""
 
@@ -72,11 +73,11 @@ class MarketplacesStream(AmazonSellerStream):
                 sandbox = self.config.get("sandbox", False)
                 if sandbox is True:
                     allorders = orders.get_orders(CreatedAfter="TEST_CASE_200")
-                else:    
+                else:
                     allorders = orders.get_orders(CreatedAfter=today_date)
                 yield {"id": mp}
                 if sandbox is True:
-                    #Since all sandbox orders are same and we found a valid marketplace. Break the loop.
+                    # Since all sandbox orders are same and we found a valid marketplace. Break the loop.
                     break
             except:
                 output = f"marketplace {mp} not part of current SP account"
@@ -219,9 +220,8 @@ class OrdersStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                rows =  self.load_order_page(
-                    mp=context.get("marketplace_id"),
-                    CreatedAfter="TEST_CASE_200"
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
@@ -699,6 +699,7 @@ class WarehouseInventory(AmazonSellerStream):
         try:
             wi = self.get_warehouse_object(mp)
             kwargs.update({"details": True})
+            del kwargs["startDateTime"]
             if self.next_token is not None:
                 kwargs.update({"nextToken": self.next_token})
 
@@ -742,7 +743,7 @@ class WarehouseInventory(AmazonSellerStream):
                                 yield return_row
                     else:
                         return_row.update({"lastUpdatedTime": ""})
-                else:        
+                else:
                     yield return_row
         except Exception as e:
             raise InvalidResponse(e)
@@ -820,10 +821,10 @@ class ProductsIventoryStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
             end_date = None
             if self.config.get("start_date"):
-                start_date = parse(self.config.get("start_date")) 
+                start_date = parse(self.config.get("start_date"))
             if self.config.get("end_date"):
                 end_date = parse(self.config.get("end_date"))
-                
+
             start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = ["GET_MERCHANT_LISTINGS_ALL_DATA"]
             processing_status = self.config.get("processing_status")
@@ -1006,9 +1007,8 @@ class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                rows =  self.load_order_page(
-                    mp=context.get("marketplace_id"),
-                    CreatedAfter="TEST_CASE_200"
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
@@ -1094,9 +1094,8 @@ class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                rows =  self.load_order_page(
-                    mp=context.get("marketplace_id"),
-                    CreatedAfter="TEST_CASE_200"
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
@@ -1182,9 +1181,8 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
-                rows =  self.load_order_page(
-                    mp=context.get("marketplace_id"),
-                    CreatedAfter="TEST_CASE_200"
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
                 )
             else:
                 rows = self.load_order_page(
