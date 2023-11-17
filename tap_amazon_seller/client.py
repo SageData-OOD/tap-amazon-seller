@@ -163,18 +163,22 @@ class AmazonSellerStream(Stream):
         end_date=None,
         type="GET_LEDGER_DETAIL_VIEW_DATA",
         report_format_type="csv",
+        reportOptions=None,
     ):
         try:
-            if start_date and end_date is not None:
-                res = reports.create_report(
-                    reportType=type,
-                    dataStartTime=start_date,
-                    dataEndTime=end_date,
-                ).payload
-            else:
-                res = reports.create_report(
-                    reportType=type, dataStartTime=start_date
-                ).payload
+            report_params = {
+                "reportType": type,
+                "dataStartTime": start_date,
+            }
+
+            if end_date is not None:
+                report_params["dataEndTime"] = end_date
+
+            if reportOptions:
+                report_params["reportOptions"] = reportOptions
+
+            res = reports.create_report(**report_params).payload
+
             if "reportId" in res:
                 self.report_id = res["reportId"]
                 return self.check_report(res["reportId"], reports, report_format_type)
@@ -268,7 +272,7 @@ class AmazonSellerStream(Stream):
 
     def translate_report(self, row):
         translate = {
-            #Japanese
+            # Japanese
             "\x8f¤\x95i\x96¼": "item-name",
             "\x8fo\x95iID": "listing-id",
             "\x8fo\x95i\x8eÒSKU": "seller-sku",
@@ -280,27 +284,27 @@ class AmazonSellerStream(Stream):
             "\x83t\x83\x8b\x83t\x83B\x83\x8b\x83\x81\x83\x93\x83g\x81E\x83`\x83\x83\x83\x93\x83l\x83\x8b": "fulfilment-channel",
             "\x83X\x83e\x81[\x83^\x83X": "status",
             "\x8fo\x95i\x93ú": "open-date",
-            #German
+            # German
             "Artikelbezeichnung": "item-name",
-            "Artikelbeschreibung":"item-description",
-            "Angebotsnummer":"listing-id",
-            "Händler-SKU":"seller-sku",
-            "Preis":"price",
-            "Menge":"quantity",
-            "Artikel ist Marketplace-Angebot":"item-is-marketplace",
-            "Produkt-ID-Typ":"product-id-type",
-            "Anmerkung zum Artikel":"item-note",
-            "Artikelzustand":"item-condition",
-            "ASIN 1":"asin1",
-            "Internationaler Versand":"will-ship-internationally",
-            "Produkt-ID":"product-id",
-            "hinzufügen-löschen":"add-delete",
-            "Anzahl Bestellungen":"pending-quantity",
-            "Versender":"fulfilment-channel",
-            "Händlerversandgruppe":"merchant-shipping-group",
-            "Status":"status",
-            "Mindestbestellmenge":"Minimum order quantity",
-            "Restposten verkaufen":"Sell remainder",
+            "Artikelbeschreibung": "item-description",
+            "Angebotsnummer": "listing-id",
+            "Händler-SKU": "seller-sku",
+            "Preis": "price",
+            "Menge": "quantity",
+            "Artikel ist Marketplace-Angebot": "item-is-marketplace",
+            "Produkt-ID-Typ": "product-id-type",
+            "Anmerkung zum Artikel": "item-note",
+            "Artikelzustand": "item-condition",
+            "ASIN 1": "asin1",
+            "Internationaler Versand": "will-ship-internationally",
+            "Produkt-ID": "product-id",
+            "hinzufügen-löschen": "add-delete",
+            "Anzahl Bestellungen": "pending-quantity",
+            "Versender": "fulfilment-channel",
+            "Händlerversandgruppe": "merchant-shipping-group",
+            "Status": "status",
+            "Mindestbestellmenge": "Minimum order quantity",
+            "Restposten verkaufen": "Sell remainder",
         }
         return_translated = False
         translated = {}

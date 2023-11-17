@@ -22,6 +22,8 @@ from tap_amazon_seller.streams import (
     VendorFulfilmentCustomerInvoicesStream,
     AFNInventoryCountryStream,
     SalesTrafficReportStream,
+    FBAInventoryLedgerDetailedReportStream,
+    FBACustomerShipmentSalesReportStream,
 )
 
 STREAM_TYPES = [
@@ -40,6 +42,8 @@ STREAM_TYPES = [
     VendorFulfilmentCustomerInvoicesStream,
     AFNInventoryCountryStream,
     SalesTrafficReportStream,
+    FBAInventoryLedgerDetailedReportStream,
+    FBACustomerShipmentSalesReportStream,
 ]
 
 
