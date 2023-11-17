@@ -12,6 +12,7 @@ from sp_api.base.exceptions import SellingApiServerException
 from dateutil.relativedelta import relativedelta
 from sp_api.base import Marketplaces
 from dateutil.parser import parse
+import time
 
 
 class MarketplacesStream(AmazonSellerStream):
@@ -1398,6 +1399,215 @@ class SalesTrafficReportStream(AmazonSellerStream):
                 start_date = end_date + timedelta(days=1)
                 end_date += timedelta(days=14)
                 do_something = ""
+
+        except Exception as e:
+            raise InvalidResponse(e)
+
+
+class FBAInventoryLedgerDetailedReportStream(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "fba_inventory_ledger_detailed"
+    primary_keys = None
+    replication_key = "Date"
+    report_id = None
+    document_id = None
+    schema = th.PropertiesList(
+        th.Property("Date", th.DateTimeType),
+        th.Property("FNSKU", th.StringType),
+        th.Property("ASIN", th.StringType),
+        th.Property("MSKU", th.StringType),
+        th.Property("Title", th.StringType),
+        th.Property("Event Type", th.StringType),
+        th.Property("Reference ID", th.StringType),
+        th.Property("Quantity", th.StringType),
+        th.Property("Fulfillment Center", th.StringType),
+        th.Property("Disposition", th.StringType),
+        th.Property("Reason", th.StringType),
+        th.Property("Country", th.StringType),
+        th.Property("Reconciled Quantity", th.StringType),
+        th.Property("Unreconciled Quantity", th.StringType),
+        th.Property("Date and Time", th.DateTimeType),
+        th.Property("report_end_date", th.DateTimeType),
+    ).to_dict()
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=5,
+    )
+    # @timeout(15)
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+            start_date = self.get_starting_timestamp(context)
+            if start_date:
+                # Remove timezone info from replication date so we can compare it with other dates.
+                start_date = start_date.replace(tzinfo=None)
+            end_date = None
+            if self.config.get("start_date") and not start_date:
+                start_date = datetime.strptime(
+                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            # We can only do look back of maximum two years in this report type
+            months_lookback = 18
+            current_date = datetime.now()
+            minimum_start_date = current_date - relativedelta(months=months_lookback)
+            if start_date < minimum_start_date:
+                # Reset start date to days limit if it is greater than days_look_back days
+                start_date = current_date - relativedelta(months=months_lookback)
+
+            end_date = current_date
+            report_type = "GET_LEDGER_DETAIL_VIEW_DATA"
+            report_types = [report_type]
+            processing_status = self.config.get("processing_status")
+            # Get list of valid marketplaces
+
+            marketplace_id = None
+            if context is not None:
+                marketplace_id = context.get("marketplace_id")
+
+            report = self.get_sp_reports(marketplace_id=marketplace_id)
+            start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
+            end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
+            items = self.get_reports_list(
+                report, report_types, processing_status, start_date_f, end_date_f
+            )
+
+            if not items["reports"]:
+                reports = self.create_report(
+                    start_date_f,
+                    report,
+                    end_date_f,
+                    report_type,
+                    reportOptions={"eventType": "Adjustments"},
+                )
+                for row in reports:
+                    row.update({"report_end_date": end_date.isoformat()})
+                    if "Date" in row:
+                        date_object = datetime.strptime(row["Date"], "%m/%d/%Y")
+                        row["Date"] = date_object.date().isoformat()
+                    yield row
+
+            # If reports are form loop through, download documents and populate the data.txt
+            for row in items["reports"]:
+                reports = self.check_report(row["reportId"], report, "json")
+                for report_row in reports:
+                    if "Date" in report_row:
+                        date_object = datetime.strptime(report_row["Date"], "%m/%d/%Y")
+                        report_row["Date"] = date_object.date().isoformat()
+                    if context is not None:
+                        report_row.update({"report_end_date": end_date.isoformat()})
+                    yield report_row
+
+        except Exception as e:
+            raise InvalidResponse(e)
+
+
+class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "fba_customer_shipment_sales"
+    primary_keys = None
+    replication_key = "shipment-date"
+    report_id = None
+    document_id = None
+    correct_end_date_minus_days = 2 #EU has upto 24 hour delay in updates
+    schema = th.PropertiesList(
+        th.Property("shipment-date", th.DateTimeType),
+        th.Property("sku", th.StringType),
+        th.Property("fnsku", th.StringType),
+        th.Property("asin", th.StringType),
+        th.Property("fulfillment-center-id", th.StringType),
+        th.Property("quantity", th.StringType),
+        th.Property("amazon-order-id", th.StringType),
+        th.Property("currency", th.StringType),
+        th.Property("item-price-per-unit", th.StringType),
+        th.Property("shipping-price", th.StringType),
+        th.Property("gift-wrap-price", th.StringType),
+        th.Property("ship-city", th.StringType),
+        th.Property("ship-state", th.StringType),
+        th.Property("ship-postal-code", th.StringType),
+    ).to_dict()
+
+    def correct_end_date(self, end_date, start_date, current_date):
+        if end_date > current_date:
+            # If end_date is greater than today then fetch report for yesterday.
+            end_date = current_date - timedelta(days=self.correct_end_date_minus_days)
+
+        if end_date <= start_date:
+            end_date = start_date
+        return end_date
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=5,
+    )
+    # @timeout(15)
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+            start_date = self.get_starting_timestamp(context)
+            if start_date:
+                # Remove timezone info from replication date so we can compare it with other dates.
+                start_date = start_date.replace(tzinfo=None)
+            end_date = None
+            if self.config.get("start_date") and not start_date:
+                start_date = datetime.strptime(
+                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+                )
+            # We can only do look back of maximum two years in this report type
+            days_look_back = 545  # Few days less than 18 months
+            current_date = datetime.now()
+            minimum_start_date = current_date - timedelta(days=days_look_back)
+            if start_date < minimum_start_date:
+                # Reset start date to days limit if it is greater than days_look_back days
+                start_date = current_date - timedelta(days=days_look_back)
+
+            end_date = start_date + timedelta(days=30)
+            end_date = self.correct_end_date(end_date, start_date, current_date)
+            report_type = "GET_FBA_FULFILLMENT_CUSTOMER_SHIPMENT_SALES_DATA"
+            report_types = [report_type]
+            processing_status = self.config.get("processing_status")
+            # Get list of valid marketplaces
+
+            marketplace_id = None
+            if context is not None:
+                marketplace_id = context.get("marketplace_id")
+
+            report = self.get_sp_reports(marketplace_id=marketplace_id)
+            while start_date <= current_date:
+                start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
+                end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
+                items = self.get_reports_list(
+                    report, report_types, processing_status, start_date_f, end_date_f
+                )
+
+                if not items["reports"]:
+                    reports = self.create_report(
+                        start_date_f,
+                        report,
+                        end_date_f,
+                        report_type,
+                    )
+                    for row in reports:
+                        row.update({"report_end_date": end_date.isoformat()})
+                        yield row
+
+                # If reports are form loop through, download documents and populate the data.txt
+                for row in items["reports"]:
+                    reports = self.check_report(row["reportId"], report, "json")
+                    for report_row in reports:
+                        if context is not None:
+                            report_row.update({"report_end_date": end_date.isoformat()})
+                        yield report_row
+                # Move to the next time period
+                start_date = end_date + timedelta(days=1)
+                end_date += timedelta(days=30)
+                end_date = self.correct_end_date(end_date, start_date, current_date)
+                # According to Amazon, spamming bad is, wait for it, good you should - Yoda's lesson of the day!
+                time.sleep(60)
 
         except Exception as e:
             raise InvalidResponse(e)
