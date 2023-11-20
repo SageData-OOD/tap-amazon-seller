@@ -97,7 +97,7 @@ def get_state_partitions_list(
 
 class AmazonSellerStream(Stream):
     """Stream class for Amazon-Seller streams."""
-
+    backoff_retries = 0
     @property
     def partitions(self) -> Optional[List[dict]]:
         result: List[dict] = []
@@ -166,6 +166,10 @@ class AmazonSellerStream(Stream):
         reportOptions=None,
     ):
         try:
+            self.backoff_retries +=1
+            if self.backoff_retries >= 9:
+                #Limit has reached gracefully end the job
+                return None
             report_params = {
                 "reportType": type,
                 "dataStartTime": start_date,
