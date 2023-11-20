@@ -1591,6 +1591,8 @@ class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
                         end_date_f,
                         report_type,
                     )
+                    if not reports:
+                        return None
                     for row in reports:
                         row.update({"report_end_date": end_date.isoformat()})
                         yield row
