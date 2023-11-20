@@ -166,7 +166,6 @@ class AmazonSellerStream(Stream):
         reportOptions=None,
     ):
         try:
-            self.backoff_retries +=1
             if self.backoff_retries >= 9:
                 #Limit has reached gracefully end the job
                 return None
@@ -187,6 +186,7 @@ class AmazonSellerStream(Stream):
                 self.report_id = res["reportId"]
                 return self.check_report(res["reportId"], reports, report_format_type)
         except Exception as e:
+            self.backoff_retries +=1
             raise InvalidResponse(e)
 
     @backoff.on_exception(
