@@ -1392,8 +1392,7 @@ class SalesTrafficReportStream(AmazonSellerStream):
                 for row in items["reports"]:
                     reports = self.check_report(row["reportId"], report, "json")
                     for report_row in reports:
-                        if context is not None:
-                            report_row.update({"report_end_date": end_date.isoformat()})
+                        report_row.update({"report_end_date": end_date.isoformat()})
                         yield report_row
                 # Move to the next time period
                 start_date = end_date + timedelta(days=1)
@@ -1496,8 +1495,8 @@ class FBAInventoryLedgerDetailedReportStream(AmazonSellerStream):
                     if "Date" in report_row:
                         date_object = datetime.strptime(report_row["Date"], "%m/%d/%Y")
                         report_row["Date"] = date_object.date().isoformat()
-                    if context is not None:
-                        report_row.update({"report_end_date": end_date.isoformat()})
+                    
+                    report_row.update({"report_end_date": end_date.isoformat()})
                     yield report_row
 
         except Exception as e:
@@ -1601,8 +1600,7 @@ class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
                 for row in items["reports"]:
                     reports = self.check_report(row["reportId"], report, "json")
                     for report_row in reports:
-                        if context is not None:
-                            report_row.update({"report_end_date": end_date.isoformat()})
+                        report_row.update({"report_end_date": end_date.isoformat()})
                         yield report_row
                 # Move to the next time period
                 start_date = end_date + timedelta(days=1)
