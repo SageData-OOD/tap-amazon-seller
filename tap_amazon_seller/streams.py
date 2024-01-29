@@ -80,8 +80,10 @@ class MarketplacesStream(AmazonSellerStream):
                 if sandbox is True:
                     # Since all sandbox orders are same and we found a valid marketplace. Break the loop.
                     break
-            except:
-                output = f"marketplace {mp} not part of current SP account"
+            except Exception as e:
+                if "invalid grant parameter" in e.message:
+                    raise Exception(e.message)
+                self.logger.info(f"marketplace {mp} not part of current SP account")
 
 
 class OrdersStream(AmazonSellerStream):
