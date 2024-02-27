@@ -619,13 +619,10 @@ class ReportsStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
             end_date = None
             if self.config.get("start_date"):
-                start_date = datetime.strptime(
-                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                start_date = parse(self.config.get("start_date"))
             if self.config.get("end_date"):
-                end_date = datetime.strptime(
-                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                end_date = parse(self.config.get("end_date"))
+
             start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = self.config.get("report_types")
             processing_status = self.config.get("processing_status")
@@ -1001,9 +998,7 @@ class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
             if self.config.get("end_date"):
-                end_date = datetime.strptime(
-                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                end_date = parse(self.config.get("end_date"))
             else:
                 # End date required by the endpoint
                 end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -1088,9 +1083,7 @@ class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
             if self.config.get("end_date"):
-                end_date = datetime.strptime(
-                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                end_date = parse(self.config.get("end_date"))
             else:
                 # End date required by the endpoint
                 end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -1175,9 +1168,7 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context) or datetime.today()
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
             if self.config.get("end_date"):
-                end_date = datetime.strptime(
-                    self.config.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                end_date = parse(self.config.get("end_date"))
             else:
                 # End date required by the endpoint
                 end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -1264,9 +1255,7 @@ class AFNInventoryCountryStream(AmazonSellerStream):
             start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
             end_date = None
             if self.config.get("start_date"):
-                start_date = datetime.strptime(
-                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                start_date = parse(self.config.get("start_date"))
 
             start_date = start_date.strftime("%Y-%m-%dT00:00:00")
             report_types = ["GET_AFN_INVENTORY_DATA_BY_COUNTRY"]
@@ -1348,9 +1337,7 @@ class SalesTrafficReportStream(AmazonSellerStream):
                 start_date = start_date.replace(tzinfo=None)
             end_date = None
             if self.config.get("start_date") and not start_date:
-                start_date = datetime.strptime(
-                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                start_date = parse(self.config.get("start_date"))
             # We can only do look back of maximum two years in this report type
             days_look_back = 730
             current_date = datetime.now()
@@ -1447,9 +1434,7 @@ class FBAInventoryLedgerDetailedReportStream(AmazonSellerStream):
                 start_date = start_date.replace(tzinfo=None)
             end_date = None
             if self.config.get("start_date") and not start_date:
-                start_date = datetime.strptime(
-                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                start_date = parse(self.config.get("start_date"))
             # We can only do look back of maximum two years in this report type
             months_lookback = 18
             current_date = datetime.now()
@@ -1555,9 +1540,7 @@ class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
                 start_date = start_date.replace(tzinfo=None)
             end_date = None
             if self.config.get("start_date") and not start_date:
-                start_date = datetime.strptime(
-                    self.config.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-                )
+                start_date = parse(self.config.get("start_date"))
             # We can only do look back of maximum two years in this report type
             days_look_back = 545  # Few days less than 18 months
             current_date = datetime.now()
