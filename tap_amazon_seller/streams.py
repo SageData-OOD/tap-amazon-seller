@@ -220,6 +220,11 @@ class OrdersStream(AmazonSellerStream):
             # Get start_date
             start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
             start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+            end_date = None
+            if self.config.get("end_date"):
+                end_date = parse(self.config.get("end_date"))
+                end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S")
+                
 
             sandbox = self.config.get("sandbox", False)
             if sandbox is True:
@@ -227,9 +232,17 @@ class OrdersStream(AmazonSellerStream):
                     mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
                 )
             else:
-                rows = self.load_order_page(
-                    mp=context.get("marketplace_id"), LastUpdatedAfter=start_date
-                )
+                if start_date and end_date:
+                    rows = self.load_order_page(
+                        mp=context.get("marketplace_id"), 
+                        LastUpdatedAfter=start_date,
+                        LastUpdatedBefore = end_date
+                    )
+                else:
+                    rows = self.load_order_page(
+                        mp=context.get("marketplace_id"), 
+                        LastUpdatedAfter=start_date
+                    )    
             for row in rows:
                 for item in row:
                     yield item
