@@ -660,6 +660,7 @@ class ReportsStream(AmazonSellerStream):
                 ).payload
 
             if not items["reports"]:
+                self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
                 reports = self.create_report(start_date, report, end_date)
                 for row in reports:
                     yield row
@@ -862,6 +863,7 @@ class ProductsIventoryStream(AmazonSellerStream):
                 ).payload
 
             if not items["reports"]:
+                self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
                 reports = self.create_report(
                     start_date, report, end_date, "GET_MERCHANT_LISTINGS_ALL_DATA"
                 )
@@ -1290,6 +1292,7 @@ class AFNInventoryCountryStream(AmazonSellerStream):
                 ).payload
 
                 if not items["reports"]:
+                    self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
                     reports = self.create_report(
                         start_date,
                         report,
@@ -1378,6 +1381,7 @@ class SalesTrafficReportStream(AmazonSellerStream):
                 )
 
                 if not items["reports"]:
+                    self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}")
                     reports = self.create_report(
                         start_date_f,
                         report,
@@ -1474,12 +1478,14 @@ class FBAInventoryLedgerDetailedReportStream(AmazonSellerStream):
             )
 
             if not items["reports"]:
+                report_options = {"eventType": "Adjustments"}
+                self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}, ReportOptions: {report_options}")
                 reports = self.create_report(
                     start_date_f,
                     report,
                     end_date_f,
                     report_type,
-                    reportOptions={"eventType": "Adjustments"},
+                    reportOptions=report_options,
                 )
                 for row in reports:
                     row.update({"report_end_date": end_date.isoformat()})
@@ -1582,6 +1588,7 @@ class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
                 )
 
                 if not items["reports"]:
+                    self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}")
                     reports = self.create_report(
                         start_date_f,
                         report,
