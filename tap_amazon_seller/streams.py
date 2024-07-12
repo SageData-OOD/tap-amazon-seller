@@ -8,12 +8,11 @@ from sp_api.util import load_all_pages
 
 from tap_amazon_seller.client import AmazonSellerStream
 from tap_amazon_seller.utils import InvalidResponse, timeout
-from sp_api.base.exceptions import SellingApiServerException
+from sp_api.base.exceptions import SellingApiServerException,SellingApiNotFoundException
 from dateutil.relativedelta import relativedelta
 from sp_api.base import Marketplaces
 from dateutil.parser import parse
 import time
-
 
 class MarketplacesStream(AmazonSellerStream):
     """Define custom stream."""
@@ -42,6 +41,8 @@ class MarketplacesStream(AmazonSellerStream):
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         if self.config.get("marketplaces"):
             marketplaces = self.config.get("marketplaces")
+            if isinstance(marketplaces, str):
+                marketplaces = marketplaces.split(",")
         else:
             marketplaces = [
                 "US",
@@ -698,6 +699,7 @@ class WarehouseInventory(AmazonSellerStream):
         th.Property("inventoryDetails", th.CustomType({"type": ["object", "string"]})),
     ).to_dict()
 
+    
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -730,13 +732,10 @@ class WarehouseInventory(AmazonSellerStream):
         for page in self.load_all_items(mp, **kwargs):
             self.next_token = page.next_token
             yield page.payload
+            
+    
 
-    @backoff.on_exception(
-        backoff.expo,
-        (Exception),
-        max_tries=10,
-        factor=3,
-    )
+    @backoff.on_exception(backoff.expo, (Exception), max_tries=10, factor=3)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         try:
             six_months_ago = datetime.today() - relativedelta(months=18)
@@ -1616,3 +1615,57 @@ class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
 
         except Exception as e:
             raise InvalidResponse(e)
+
+class ProductDetailsV2Stream(AmazonSellerStream):
+    """Define custom stream."""
+
+    name = "product_catalog_details"
+    primary_keys = ["ASIN"]
+    replication_key = None
+    asin = "{ASIN}"
+    parent_stream_type = ProductsIventoryStream
+    # Optionally, you may also use `schema_filepath` in place of `schema`:
+    # schema_filepath = SCHEMAS_DIR / "users.json"
+    schema = th.PropertiesList(
+        th.Property("ASIN", th.StringType),
+        th.Property("identifiers", th.CustomType({"type": ["array", "string"]})),
+        th.Property("attributes", th.CustomType({"type": ["object", "string"]})),
+       
+        th.Property("marketplace_id", th.StringType),
+    ).to_dict()
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    @timeout(15)
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        try:
+            # if context is not None:
+            asin = context.get("ASIN")
+            catalog = self.get_sp_catalog_item(context.get("marketplace_id"))
+            # Requesting relationships along with this data results in an error. 
+            # requesting summaries nullifies other requests and only summaries are part of the response
+            product_include_data = ['attributes','identifiers']
+            if self.config.get("products_include_data"):
+                product_include_data = self.config.get("products_include_data")
+                if isinstance(product_include_data, str):
+                    product_include_data = product_include_data.split(",")
+                
+            
+            items = catalog.get_catalog_item(asin=asin,includedData=product_include_data).payload
+            if "Items" in items:
+                if len(items["Items"]) > 0:
+                    items = items["Items"][0]
+            items.update({"ASIN": asin})
+            items.update({"marketplace_id": context.get("marketplace_id")})
+            return [items]
+            # else:
+            #     return []
+        except SellingApiNotFoundException as e:
+            self.logger.warn(e)
+            return []      
+        except Exception as e:
+            raise InvalidResponse(e)        
