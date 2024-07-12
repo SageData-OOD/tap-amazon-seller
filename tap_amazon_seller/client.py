@@ -12,6 +12,7 @@ from sp_api.api import (
     VendorDirectFulfillmentOrders,
     VendorDirectFulfillmentShipping,
     VendorOrders,
+    CatalogItems
 )
 from sp_api.base import Marketplaces
 import csv
@@ -397,3 +398,10 @@ class AmazonSellerStream(Stream):
             dataStartTime=start_date_f,
             dataEndTime=end_date_f,
         ).payload
+    
+    def get_sp_catalog_item(self, marketplace_id=None):
+        if marketplace_id is None:
+            marketplace_id = self.config.get("marketplace", "US")
+        return CatalogItems(
+            credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
+        )    
