@@ -23,6 +23,8 @@ from datetime import datetime
 import json
 import backoff
 from tap_amazon_seller.reportsv3 import ReportsV3
+import singer
+from singer import StateMessage
 
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
@@ -99,6 +101,28 @@ def get_state_partitions_list(
 class AmazonSellerStream(Stream):
     """Stream class for Amazon-Seller streams."""
     backoff_retries = 0
+
+    def _write_state_message(self) -> None:
+        """Write out a STATE message with the latest state."""
+        tap_state = self.tap_state
+        if tap_state and tap_state.get("bookmarks"):
+            for stream_name in tap_state.get("bookmarks").keys():
+                if stream_name in [
+                    "orderitems",
+                    "orderbuyerinfo",
+                    "orderaddress",
+                    "orderfinancialevents",
+                    "warehouse_inventory",
+                    "products_inventory",
+                    "product_details",
+                    "vendor_fulfilment_purchase_orders",
+                    "vendor_fulfilment_customer_invoices",
+                    "vendor_purchase_orders",
+                    "product_catalog_details",
+                ] and tap_state["bookmarks"][stream_name].get("partitions"):
+                    tap_state["bookmarks"][stream_name] = {"partitions": []}
+        singer.write_message(StateMessage(value=tap_state))
+
     @property
     def partitions(self) -> Optional[List[dict]]:
         result: List[dict] = []
@@ -186,9 +210,9 @@ class AmazonSellerStream(Stream):
             if "reportId" in res:
                 self.report_id = res["reportId"]
                 return self.check_report(res["reportId"], reports, report_format_type)
-        except Exception as e:
+        except:
             self.backoff_retries +=1
-            raise InvalidResponse(e)
+            raise
 
     @backoff.on_exception(
         backoff.expo,
@@ -197,10 +221,7 @@ class AmazonSellerStream(Stream):
         factor=5,
     )
     def get_report(self, report_id, reports):
-        try:
-            return reports.get_report(report_id)
-        except Exception as e:
-            raise InvalidResponse(e)
+        return reports.get_report(report_id)
 
     @backoff.on_exception(
         backoff.expo,
@@ -209,17 +230,14 @@ class AmazonSellerStream(Stream):
         factor=5,
     )
     def save_document(self, document_id, reports, report_type="csv"):
-        try:
-            res = reports.get_report_document(
-                document_id,
-                decrypt=True,
-                file=f"{ROOT_DIR}/{document_id}_document.{report_type}",
-                download=True,
-            )
-            self.reportDocumentId = document_id
-            return res
-        except Exception as e:
-            raise InvalidResponse(e)
+        res = reports.get_report_document(
+            document_id,
+            decrypt=True,
+            file=f"{ROOT_DIR}/{document_id}_document.{report_type}",
+            download=True,
+        )
+        self.reportDocumentId = document_id
+        return res
 
     def read_csv(self, file):
         finalList = []

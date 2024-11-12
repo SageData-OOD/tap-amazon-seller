@@ -191,12 +191,9 @@ class OrdersStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        try:
-            orders = self.get_sp_orders(mp)
-            orders_obj = orders.get_orders(**kwargs)
-            return orders_obj
-        except Exception as e:
-            raise InvalidResponse(e)
+        orders = self.get_sp_orders(mp)
+        orders_obj = orders.get_orders(**kwargs)
+        return orders_obj
 
     def load_order_page(self, mp, **kwargs):
         """
@@ -217,38 +214,35 @@ class OrdersStream(AmazonSellerStream):
         factor=3,
     )
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            # Get start_date
-            start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
-            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-            end_date = None
-            if self.config.get("end_date"):
-                end_date = parse(self.config.get("end_date"))
-                end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S")
-                
+        # Get start_date
+        start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
+        start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+        end_date = None
+        if self.config.get("end_date"):
+            end_date = parse(self.config.get("end_date"))
+            end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S")
+            
 
-            sandbox = self.config.get("sandbox", False)
-            if sandbox is True:
+        sandbox = self.config.get("sandbox", False)
+        if sandbox is True:
+            rows = self.load_order_page(
+                mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
+            )
+        else:
+            if start_date and end_date:
                 rows = self.load_order_page(
-                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
+                    mp=context.get("marketplace_id"), 
+                    LastUpdatedAfter=start_date,
+                    LastUpdatedBefore = end_date
                 )
             else:
-                if start_date and end_date:
-                    rows = self.load_order_page(
-                        mp=context.get("marketplace_id"), 
-                        LastUpdatedAfter=start_date,
-                        LastUpdatedBefore = end_date
-                    )
-                else:
-                    rows = self.load_order_page(
-                        mp=context.get("marketplace_id"), 
-                        LastUpdatedAfter=start_date
-                    )    
-            for row in rows:
-                for item in row:
-                    yield item
-        except Exception as e:
-            raise InvalidResponse(e)
+                rows = self.load_order_page(
+                    mp=context.get("marketplace_id"), 
+                    LastUpdatedAfter=start_date
+                )    
+        for row in rows:
+            for item in row:
+                yield item
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
@@ -360,21 +354,18 @@ class OrderItemsStream(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            order_id = context.get("AmazonOrderId", [])
+        order_id = context.get("AmazonOrderId", [])
 
-            orders = self.get_sp_orders(context.get("marketplace_id"))
-            # self.state_partitioning_keys = context
-            self.state_partitioning_keys = self.partitions[len(self.partitions) - 1]
-            # self.state_partitioning_keys = self.partitions
-            sandbox = self.config.get("sandbox", False)
-            if sandbox is False:
-                items = orders.get_order_items(order_id=order_id).payload
-            else:
-                items = orders.get_order_items("'TEST_CASE_200'").payload
-            return [items]
-        except Exception as e:
-            raise InvalidResponse(e)
+        orders = self.get_sp_orders(context.get("marketplace_id"))
+        # self.state_partitioning_keys = context
+        self.state_partitioning_keys = self.partitions[len(self.partitions) - 1]
+        # self.state_partitioning_keys = self.partitions
+        sandbox = self.config.get("sandbox", False)
+        if sandbox is False:
+            items = orders.get_order_items(order_id=order_id).payload
+        else:
+            items = orders.get_order_items("'TEST_CASE_200'").payload
+        return [items]
 
 
 class OrderBuyerInfo(AmazonSellerStream):
@@ -404,14 +395,11 @@ class OrderBuyerInfo(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            order_id = context.get("AmazonOrderId", [])
+        order_id = context.get("AmazonOrderId", [])
 
-            orders = self.get_sp_orders(context.get("marketplace_id"))
-            items = orders.get_order_buyer_info(order_id=order_id).payload
-            return [items]
-        except Exception as e:
-            raise InvalidResponse(e)
+        orders = self.get_sp_orders(context.get("marketplace_id"))
+        items = orders.get_order_buyer_info(order_id=order_id).payload
+        return [items]
 
 
 class OrderAddress(AmazonSellerStream):
@@ -454,14 +442,11 @@ class OrderAddress(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            order_id = context.get("AmazonOrderId", [])
+        order_id = context.get("AmazonOrderId", [])
 
-            orders = self.get_sp_orders(context.get("marketplace_id"))
-            items = orders.get_order_address(order_id=order_id).payload
-            return [items]
-        except Exception as e:
-            raise InvalidResponse(e)
+        orders = self.get_sp_orders(context.get("marketplace_id"))
+        items = orders.get_order_address(order_id=order_id).payload
+        return [items]
 
 
 class OrderFinancialEvents(AmazonSellerStream):
@@ -569,22 +554,19 @@ class OrderFinancialEvents(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            order_id = context.get("AmazonOrderId", [])
+        order_id = context.get("AmazonOrderId", [])
 
-            finance = self.get_sp_finance(context.get("marketplace_id"))
+        finance = self.get_sp_finance(context.get("marketplace_id"))
 
-            sandbox = self.config.get("sandbox", False)
-            if sandbox is False:
-                # self.state_partitioning_keys = self.partitions
-                self.state_partitioning_keys = self.partitions[len(self.partitions) - 1]
-                items = finance.get_financial_events_for_order(order_id).payload
-                items["AmazonOrderId"] = order_id
-            else:
-                items = finance.get_financial_events_for_order("TEST_CASE_200").payload
-            return [items["FinancialEvents"]]
-        except Exception as e:
-            raise InvalidResponse(e)
+        sandbox = self.config.get("sandbox", False)
+        if sandbox is False:
+            # self.state_partitioning_keys = self.partitions
+            self.state_partitioning_keys = self.partitions[len(self.partitions) - 1]
+            items = finance.get_financial_events_for_order(order_id).payload
+            items["AmazonOrderId"] = order_id
+        else:
+            items = finance.get_financial_events_for_order("TEST_CASE_200").payload
+        return [items["FinancialEvents"]]
 
 
 class ReportsStream(AmazonSellerStream):
@@ -629,51 +611,47 @@ class ReportsStream(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
-            end_date = None
-            if self.config.get("start_date"):
-                start_date = parse(self.config.get("start_date"))
-            if self.config.get("end_date"):
-                end_date = parse(self.config.get("end_date"))
+        start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
+        end_date = None
+        if self.config.get("start_date"):
+            start_date = parse(self.config.get("start_date"))
+        if self.config.get("end_date"):
+            end_date = parse(self.config.get("end_date"))
 
-            start_date = start_date.strftime("%Y-%m-%dT00:00:00")
-            report_types = self.config.get("report_types")
-            processing_status = self.config.get("processing_status")
-            marketplace_id = None
-            if context is not None:
-                marketplace_id = context.get("marketplace_id")
+        start_date = start_date.strftime("%Y-%m-%dT00:00:00")
+        report_types = self.config.get("report_types")
+        processing_status = self.config.get("processing_status")
+        marketplace_id = None
+        if context is not None:
+            marketplace_id = context.get("marketplace_id")
 
-            report = self.get_sp_reports()
-            if start_date and end_date is not None:
-                end_date = end_date.strftime("%Y-%m-%dT23:59:59")
-                items = report.get_reports(
-                    reportTypes=report_types,
-                    processingStatuses=processing_status,
-                    dataStartTime=start_date,
-                    dataEndTime=end_date,
-                ).payload
-            else:
-                items = report.get_reports(
-                    reportTypes=report_types,
-                    processingStatuses=processing_status,
-                    dataStartTime=start_date,
-                ).payload
+        report = self.get_sp_reports()
+        if start_date and end_date is not None:
+            end_date = end_date.strftime("%Y-%m-%dT23:59:59")
+            items = report.get_reports(
+                reportTypes=report_types,
+                processingStatuses=processing_status,
+                dataStartTime=start_date,
+                dataEndTime=end_date,
+            ).payload
+        else:
+            items = report.get_reports(
+                reportTypes=report_types,
+                processingStatuses=processing_status,
+                dataStartTime=start_date,
+            ).payload
 
-            if not items["reports"]:
-                self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
-                reports = self.create_report(start_date, report, end_date)
-                for row in reports:
-                    yield row
+        if not items["reports"]:
+            self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
+            reports = self.create_report(start_date, report, end_date)
+            for row in reports:
+                yield row
 
-            # If reports are form loop through, download documents and populate the data.txt
-            for row in items["reports"]:
-                reports = self.check_report(row["reportId"], report)
-                for report_row in reports:
-                    yield report_row
-
-        except Exception as e:
-            raise InvalidResponse(e)
+        # If reports are form loop through, download documents and populate the data.txt
+        for row in items["reports"]:
+            reports = self.check_report(row["reportId"], report)
+            for report_row in reports:
+                yield report_row
 
 
 class WarehouseInventory(AmazonSellerStream):
@@ -712,17 +690,14 @@ class WarehouseInventory(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        try:
-            wi = self.get_warehouse_object(mp)
-            kwargs.update({"details": True})
-            del kwargs["startDateTime"]
-            if self.next_token is not None:
-                kwargs.update({"nextToken": self.next_token})
+        wi = self.get_warehouse_object(mp)
+        kwargs.update({"details": True})
+        del kwargs["startDateTime"]
+        if self.next_token is not None:
+            kwargs.update({"nextToken": self.next_token})
 
-            list = wi.get_inventory_summary_marketplace(**kwargs)
-            return list
-        except Exception as e:
-            raise InvalidResponse(e)
+        list = wi.get_inventory_summary_marketplace(**kwargs)
+        return list
 
     def load_item_page(self, mp, **kwargs):
         """
@@ -737,29 +712,26 @@ class WarehouseInventory(AmazonSellerStream):
 
     @backoff.on_exception(backoff.expo, (Exception), max_tries=10, factor=3)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            six_months_ago = datetime.today() - relativedelta(months=18)
-            start_date = self.get_starting_timestamp(context) or six_months_ago
-            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-            rows = self.load_item_page(
-                mp=context.get("marketplace_id"), startDateTime=start_date
-            )
+        six_months_ago = datetime.today() - relativedelta(months=18)
+        start_date = self.get_starting_timestamp(context) or six_months_ago
+        start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+        rows = self.load_item_page(
+            mp=context.get("marketplace_id"), startDateTime=start_date
+        )
 
-            for row in rows:
-                return_row = {"marketplace_id": context.get("marketplace_id")}
-                if "granularity" in row:
-                    return_row.update(row["granularity"])
-                    if "inventorySummaries" in row:
-                        if len(row["inventorySummaries"]) > 0:
-                            for summary in row["inventorySummaries"]:
-                                return_row.update(summary)
-                                yield return_row
-                    else:
-                        return_row.update({"lastUpdatedTime": ""})
+        for row in rows:
+            return_row = {"marketplace_id": context.get("marketplace_id")}
+            if "granularity" in row:
+                return_row.update(row["granularity"])
+                if "inventorySummaries" in row:
+                    if len(row["inventorySummaries"]) > 0:
+                        for summary in row["inventorySummaries"]:
+                            return_row.update(summary)
+                            yield return_row
                 else:
-                    yield return_row
-        except Exception as e:
-            raise InvalidResponse(e)
+                    return_row.update({"lastUpdatedTime": ""})
+            else:
+                yield return_row
 
 
 class ProductsIventoryStream(AmazonSellerStream):
@@ -830,57 +802,53 @@ class ProductsIventoryStream(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
-            end_date = None
-            if self.config.get("start_date"):
-                start_date = parse(self.config.get("start_date"))
-            if self.config.get("end_date"):
-                end_date = parse(self.config.get("end_date"))
+        start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
+        end_date = None
+        if self.config.get("start_date"):
+            start_date = parse(self.config.get("start_date"))
+        if self.config.get("end_date"):
+            end_date = parse(self.config.get("end_date"))
 
-            start_date = start_date.strftime("%Y-%m-%dT00:00:00")
-            report_types = ["GET_MERCHANT_LISTINGS_ALL_DATA"]
-            processing_status = self.config.get("processing_status")
-            marketplace_id = None
-            if context is not None:
-                marketplace_id = context.get("marketplace_id")
+        start_date = start_date.strftime("%Y-%m-%dT00:00:00")
+        report_types = ["GET_MERCHANT_LISTINGS_ALL_DATA"]
+        processing_status = self.config.get("processing_status")
+        marketplace_id = None
+        if context is not None:
+            marketplace_id = context.get("marketplace_id")
 
-            report = self.get_sp_reports(marketplace_id=marketplace_id)
-            if start_date and end_date is not None:
-                end_date = end_date.strftime("%Y-%m-%dT23:59:59")
-                items = report.get_reports(
-                    reportTypes=report_types,
-                    processingStatuses=processing_status,
-                    dataStartTime=start_date,
-                    dataEndTime=end_date,
-                ).payload
-            else:
-                items = report.get_reports(
-                    reportTypes=report_types,
-                    processingStatuses=processing_status,
-                    dataStartTime=start_date,
-                ).payload
+        report = self.get_sp_reports(marketplace_id=marketplace_id)
+        if start_date and end_date is not None:
+            end_date = end_date.strftime("%Y-%m-%dT23:59:59")
+            items = report.get_reports(
+                reportTypes=report_types,
+                processingStatuses=processing_status,
+                dataStartTime=start_date,
+                dataEndTime=end_date,
+            ).payload
+        else:
+            items = report.get_reports(
+                reportTypes=report_types,
+                processingStatuses=processing_status,
+                dataStartTime=start_date,
+            ).payload
 
-            if not items["reports"]:
-                self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
-                reports = self.create_report(
-                    start_date, report, end_date, "GET_MERCHANT_LISTINGS_ALL_DATA"
-                )
-                for row in reports:
-                    yield row
+        if not items["reports"]:
+            self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
+            reports = self.create_report(
+                start_date, report, end_date, "GET_MERCHANT_LISTINGS_ALL_DATA"
+            )
+            for row in reports:
+                yield row
 
-            # If reports are form loop through, download documents and populate the data.txt
-            for row in items["reports"]:
-                reports = self.check_report(row["reportId"], report)
-                for report_row in reports:
-                    if context is not None:
-                        report_row.update(
-                            {marketplace_id: context.get("marketplace_id")}
-                        )
-                    yield report_row
-
-        except Exception as e:
-            raise InvalidResponse(e)
+        # If reports are form loop through, download documents and populate the data.txt
+        for row in items["reports"]:
+            reports = self.check_report(row["reportId"], report)
+            for report_row in reports:
+                if context is not None:
+                    report_row.update(
+                        {marketplace_id: context.get("marketplace_id")}
+                    )
+                yield report_row
 
 
 class ProductDetails(AmazonSellerStream):
@@ -910,26 +878,21 @@ class ProductDetails(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            # if context is not None:
-            asin = context.get("ASIN")
-            catalog = self.get_sp_catalog(context.get("marketplace_id"))
-            if context.get("marketplace_id") == "JP":
-                items = catalog.list_items(JAN=asin).payload
-            elif context.get("marketplace_id") in ["FR"]:
-                items = catalog.list_items(EAN=asin).payload
-            else:
-                items = catalog.get_item(asin=asin).payload
-            if "Items" in items:
-                if len(items["Items"]) > 0:
-                    items = items["Items"][0]
-            items.update({"ASIN": asin})
-            items.update({"marketplace_id": context.get("marketplace_id")})
-            return [items]
-            # else:
-            #     return []
-        except Exception as e:
-            raise InvalidResponse(e)
+        # if context is not None:
+        asin = context.get("ASIN")
+        catalog = self.get_sp_catalog(context.get("marketplace_id"))
+        if context.get("marketplace_id") == "JP":
+            items = catalog.list_items(JAN=asin).payload
+        elif context.get("marketplace_id") in ["FR"]:
+            items = catalog.list_items(EAN=asin).payload
+        else:
+            items = catalog.get_item(asin=asin).payload
+        if "Items" in items:
+            if len(items["Items"]) > 0:
+                items = items["Items"][0]
+        items.update({"ASIN": asin})
+        items.update({"marketplace_id": context.get("marketplace_id")})
+        return [items]
 
 
 class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
@@ -981,12 +944,9 @@ class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        try:
-            orders = self.get_sp_vendor_fulfilment(mp)
-            orders_obj = orders.get_orders(**kwargs)
-            return orders_obj
-        except Exception as e:
-            raise InvalidResponse(e)
+        orders = self.get_sp_vendor_fulfilment(mp)
+        orders_obj = orders.get_orders(**kwargs)
+        return orders_obj
 
     def load_order_page(self, mp, **kwargs):
         """
@@ -1007,32 +967,29 @@ class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
         factor=3,
     )
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            # Get start_date
-            start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
-            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-            if self.config.get("end_date"):
-                end_date = parse(self.config.get("end_date"))
-            else:
-                # End date required by the endpoint
-                end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        # Get start_date
+        start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
+        start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+        if self.config.get("end_date"):
+            end_date = parse(self.config.get("end_date"))
+        else:
+            # End date required by the endpoint
+            end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-            sandbox = self.config.get("sandbox", False)
-            if sandbox is True:
-                rows = self.load_order_page(
-                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
-                )
-            else:
-                rows = self.load_order_page(
-                    mp=context.get("marketplace_id"),
-                    createdBefore=end_date,
-                    createdAfter=start_date,
-                )
-            for row in rows:
-                for item in row:
-                    yield item
-        except Exception as e:
-            raise InvalidResponse(e)
+        sandbox = self.config.get("sandbox", False)
+        if sandbox is True:
+            rows = self.load_order_page(
+                mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
+            )
+        else:
+            rows = self.load_order_page(
+                mp=context.get("marketplace_id"),
+                createdBefore=end_date,
+                createdAfter=start_date,
+            )
+        for row in rows:
+            for item in row:
+                yield item
 
 
 class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
@@ -1066,12 +1023,9 @@ class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        try:
-            vendor_shipping = self.get_sp_vendor_fulfilment_shipping(mp)
-            invoices_obj = vendor_shipping.get_orders(**kwargs)
-            return invoices_obj
-        except Exception as e:
-            raise InvalidResponse(e)
+        vendor_shipping = self.get_sp_vendor_fulfilment_shipping(mp)
+        invoices_obj = vendor_shipping.get_orders(**kwargs)
+        return invoices_obj
 
     def load_order_page(self, mp, **kwargs):
         """
@@ -1092,32 +1046,29 @@ class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
         factor=3,
     )
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            # Get start_date
-            start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
-            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-            if self.config.get("end_date"):
-                end_date = parse(self.config.get("end_date"))
-            else:
-                # End date required by the endpoint
-                end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        # Get start_date
+        start_date = self.get_starting_timestamp(context) or datetime(2000, 1, 1)
+        start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+        if self.config.get("end_date"):
+            end_date = parse(self.config.get("end_date"))
+        else:
+            # End date required by the endpoint
+            end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-            sandbox = self.config.get("sandbox", False)
-            if sandbox is True:
-                rows = self.load_order_page(
-                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
-                )
-            else:
-                rows = self.load_order_page(
-                    mp=context.get("marketplace_id"),
-                    createdBefore=end_date,
-                    createdAfter=start_date,
-                )
-            for row in rows:
-                for item in row:
-                    yield item
-        except Exception as e:
-            raise InvalidResponse(e)
+        sandbox = self.config.get("sandbox", False)
+        if sandbox is True:
+            rows = self.load_order_page(
+                mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
+            )
+        else:
+            rows = self.load_order_page(
+                mp=context.get("marketplace_id"),
+                createdBefore=end_date,
+                createdAfter=start_date,
+            )
+        for row in rows:
+            for item in row:
+                yield item
 
 
 class VendorPurchaseOrdersStream(AmazonSellerStream):
@@ -1151,12 +1102,9 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-        try:
-            orders = self.get_sp_vendor(mp)
-            orders_obj = orders.get_purchase_orders(**kwargs)
-            return orders_obj
-        except Exception as e:
-            raise InvalidResponse(e)
+        orders = self.get_sp_vendor(mp)
+        orders_obj = orders.get_purchase_orders(**kwargs)
+        return orders_obj
 
     def load_order_page(self, mp, **kwargs):
         """
@@ -1177,33 +1125,30 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
         factor=3,
     )
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            # Get start_date
-            start_date = self.get_starting_timestamp(context) or datetime.today()
-            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
-            if self.config.get("end_date"):
-                end_date = parse(self.config.get("end_date"))
-            else:
-                # End date required by the endpoint
-                end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        # Get start_date
+        start_date = self.get_starting_timestamp(context) or datetime.today()
+        start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+        if self.config.get("end_date"):
+            end_date = parse(self.config.get("end_date"))
+        else:
+            # End date required by the endpoint
+            end_date = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-            sandbox = self.config.get("sandbox", False)
-            if sandbox is True:
-                rows = self.load_order_page(
-                    mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
-                )
-            else:
-                rows = self.load_order_page(
-                    mp=context.get("marketplace_id"),
-                    createdAfter=start_date,
-                    limit=100,
-                    SortOrder="DESC",
-                )
-            for row in rows:
-                for item in row:
-                    yield item
-        except Exception as e:
-            raise InvalidResponse(e)
+        sandbox = self.config.get("sandbox", False)
+        if sandbox is True:
+            rows = self.load_order_page(
+                mp=context.get("marketplace_id"), CreatedAfter="TEST_CASE_200"
+            )
+        else:
+            rows = self.load_order_page(
+                mp=context.get("marketplace_id"),
+                createdAfter=start_date,
+                limit=100,
+                SortOrder="DESC",
+            )
+        for row in rows:
+            for item in row:
+                yield item
 
 
 class AFNInventoryCountryStream(AmazonSellerStream):
@@ -1246,73 +1191,69 @@ class AFNInventoryCountryStream(AmazonSellerStream):
     )
     # @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            # Leaving it here for EU marketplaces reference.
-            eu_marketplaces = [
-                "ES",
-                "UK",
-                "BE",
-                "GB",
-                "FR",
-                "NL",
-                "DE",
-                "IT",
-                "SE",
-                "ZA",
-                "PL",
-                "EG",
-                "TR",
-                "SA",
-                "AE",
-                "IN",
-            ]
-            start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
-            end_date = None
-            if self.config.get("start_date"):
-                start_date = parse(self.config.get("start_date"))
+        # Leaving it here for EU marketplaces reference.
+        eu_marketplaces = [
+            "ES",
+            "UK",
+            "BE",
+            "GB",
+            "FR",
+            "NL",
+            "DE",
+            "IT",
+            "SE",
+            "ZA",
+            "PL",
+            "EG",
+            "TR",
+            "SA",
+            "AE",
+            "IN",
+        ]
+        start_date = self.get_starting_timestamp(context) or datetime(2005, 1, 1)
+        end_date = None
+        if self.config.get("start_date"):
+            start_date = parse(self.config.get("start_date"))
 
-            start_date = start_date.strftime("%Y-%m-%dT00:00:00")
-            report_types = ["GET_AFN_INVENTORY_DATA_BY_COUNTRY"]
-            processing_status = self.config.get("processing_status")
-            # Get list of valid marketplaces
-            marketplaces = self.get_valid_marketplaces()
-            common_marketplaces = list(set(marketplaces).intersection(eu_marketplaces))
-            marketplace_id = None
-            if len(common_marketplaces) > 0:
-                marketplace_id = common_marketplaces[0]
+        start_date = start_date.strftime("%Y-%m-%dT00:00:00")
+        report_types = ["GET_AFN_INVENTORY_DATA_BY_COUNTRY"]
+        processing_status = self.config.get("processing_status")
+        # Get list of valid marketplaces
+        marketplaces = self.get_valid_marketplaces()
+        common_marketplaces = list(set(marketplaces).intersection(eu_marketplaces))
+        marketplace_id = None
+        if len(common_marketplaces) > 0:
+            marketplace_id = common_marketplaces[0]
 
-            if marketplace_id in eu_marketplaces:
-                report = self.get_sp_reports(marketplace_id=marketplace_id)
+        if marketplace_id in eu_marketplaces:
+            report = self.get_sp_reports(marketplace_id=marketplace_id)
 
-                items = report.get_reports(
-                    reportTypes=report_types,
-                    processingStatuses=processing_status,
-                    dataStartTime=start_date,
-                ).payload
+            items = report.get_reports(
+                reportTypes=report_types,
+                processingStatuses=processing_status,
+                dataStartTime=start_date,
+            ).payload
 
-                if not items["reports"]:
-                    self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
-                    reports = self.create_report(
-                        start_date,
-                        report,
-                        end_date,
-                        "GET_AFN_INVENTORY_DATA_BY_COUNTRY",
-                    )
-                    for row in reports:
-                        yield row
+            if not items["reports"]:
+                self.logger.info(f"Creating new report. StartDate:{start_date}, EndDate: {end_date}, ReportName:{self.name}")
+                reports = self.create_report(
+                    start_date,
+                    report,
+                    end_date,
+                    "GET_AFN_INVENTORY_DATA_BY_COUNTRY",
+                )
+                for row in reports:
+                    yield row
 
-                # If reports are form loop through, download documents and populate the data.txt
-                for row in items["reports"]:
-                    reports = self.check_report(row["reportId"], report)
-                    for report_row in reports:
-                        if context is not None:
-                            report_row.update(
-                                {marketplace_id: context.get("marketplace_id")}
-                            )
-                        yield report_row
-
-        except Exception as e:
-            raise InvalidResponse(e)
+            # If reports are form loop through, download documents and populate the data.txt
+            for row in items["reports"]:
+                reports = self.check_report(row["reportId"], report)
+                for report_row in reports:
+                    if context is not None:
+                        report_row.update(
+                            {marketplace_id: context.get("marketplace_id")}
+                        )
+                    yield report_row
 
 
 class SalesTrafficReportStream(AmazonSellerStream):
@@ -1345,67 +1286,62 @@ class SalesTrafficReportStream(AmazonSellerStream):
     )
     # @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            start_date = self.get_starting_timestamp(context)
-            if start_date:
-                # Remove timezone info from replication date so we can compare it with other dates.
-                start_date = start_date.replace(tzinfo=None)
-            end_date = None
-            if self.config.get("start_date") and not start_date:
-                start_date = parse(self.config.get("start_date"))
-            # We can only do look back of maximum two years in this report type
-            days_look_back = 730
-            current_date = datetime.now()
-            minimum_start_date = current_date - timedelta(days=days_look_back)
-            if start_date < minimum_start_date:
-                # Reset start date to days limit if it is greater than days_look_back days
-                start_date = current_date - timedelta(days=days_look_back)
+        start_date = self.get_starting_timestamp(context)
+        if start_date:
+            # Remove timezone info from replication date so we can compare it with other dates.
+            start_date = start_date.replace(tzinfo=None)
+        end_date = None
+        if self.config.get("start_date") and not start_date:
+            start_date = parse(self.config.get("start_date"))
+        # We can only do look back of maximum two years in this report type
+        days_look_back = 730
+        current_date = datetime.now()
+        minimum_start_date = current_date - timedelta(days=days_look_back)
+        if start_date < minimum_start_date:
+            # Reset start date to days limit if it is greater than days_look_back days
+            start_date = current_date - timedelta(days=days_look_back)
 
-            end_date = start_date + timedelta(days=14)
-            report_type = "GET_SALES_AND_TRAFFIC_REPORT"
-            report_types = [report_type]
-            processing_status = self.config.get("processing_status")
-            # Get list of valid marketplaces
+        end_date = start_date + timedelta(days=14)
+        report_type = "GET_SALES_AND_TRAFFIC_REPORT"
+        report_types = [report_type]
+        processing_status = self.config.get("processing_status")
+        # Get list of valid marketplaces
 
-            marketplace_id = None
-            if context is not None:
-                marketplace_id = context.get("marketplace_id")
+        marketplace_id = None
+        if context is not None:
+            marketplace_id = context.get("marketplace_id")
 
-            report = self.get_sp_reports(marketplace_id=marketplace_id)
-            while start_date <= current_date:
-                start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
-                end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
-                items = self.get_reports_list(
-                    report, report_types, processing_status, start_date_f, end_date_f
+        report = self.get_sp_reports(marketplace_id=marketplace_id)
+        while start_date <= current_date:
+            start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
+            end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
+            items = self.get_reports_list(
+                report, report_types, processing_status, start_date_f, end_date_f
+            )
+
+            if not items["reports"]:
+                self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}")
+                reports = self.create_report(
+                    start_date_f,
+                    report,
+                    end_date_f,
+                    report_type,
+                    # reportOptions={"reportPeriod": "DAY","sellingProgram": "RETAIL","distributorView": "MANUFACTURING"},
+                    report_format_type="json",
                 )
+                for row in reports:
+                    row.update({"report_end_date": end_date.isoformat()})
+                    yield row
 
-                if not items["reports"]:
-                    self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}")
-                    reports = self.create_report(
-                        start_date_f,
-                        report,
-                        end_date_f,
-                        report_type,
-                        # reportOptions={"reportPeriod": "DAY","sellingProgram": "RETAIL","distributorView": "MANUFACTURING"},
-                        report_format_type="json",
-                    )
-                    for row in reports:
-                        row.update({"report_end_date": end_date.isoformat()})
-                        yield row
-
-                # If reports are form loop through, download documents and populate the data.txt
-                for row in items["reports"]:
-                    reports = self.check_report(row["reportId"], report, "json")
-                    for report_row in reports:
-                        report_row.update({"report_end_date": end_date.isoformat()})
-                        yield report_row
-                # Move to the next time period
-                start_date = end_date + timedelta(days=1)
-                end_date += timedelta(days=14)
-                do_something = ""
-
-        except Exception as e:
-            raise InvalidResponse(e)
+            # If reports are form loop through, download documents and populate the data.txt
+            for row in items["reports"]:
+                reports = self.check_report(row["reportId"], report, "json")
+                for report_row in reports:
+                    report_row.update({"report_end_date": end_date.isoformat()})
+                    yield report_row
+            # Move to the next time period
+            start_date = end_date + timedelta(days=1)
+            end_date += timedelta(days=14)
 
 
 class FBAInventoryLedgerDetailedReportStream(AmazonSellerStream):
@@ -1443,69 +1379,65 @@ class FBAInventoryLedgerDetailedReportStream(AmazonSellerStream):
     )
     # @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            start_date = self.get_starting_timestamp(context)
-            if start_date:
-                # Remove timezone info from replication date so we can compare it with other dates.
-                start_date = start_date.replace(tzinfo=None)
-            end_date = None
-            if self.config.get("start_date") and not start_date:
-                start_date = parse(self.config.get("start_date"))
-            # We can only do look back of maximum two years in this report type
-            months_lookback = 18
-            current_date = datetime.now()
-            minimum_start_date = current_date - relativedelta(months=months_lookback)
-            if start_date < minimum_start_date:
-                # Reset start date to days limit if it is greater than days_look_back days
-                start_date = current_date - relativedelta(months=months_lookback)
+        start_date = self.get_starting_timestamp(context)
+        if start_date:
+            # Remove timezone info from replication date so we can compare it with other dates.
+            start_date = start_date.replace(tzinfo=None)
+        end_date = None
+        if self.config.get("start_date") and not start_date:
+            start_date = parse(self.config.get("start_date"))
+        # We can only do look back of maximum two years in this report type
+        months_lookback = 18
+        current_date = datetime.now()
+        minimum_start_date = current_date - relativedelta(months=months_lookback)
+        if start_date < minimum_start_date:
+            # Reset start date to days limit if it is greater than days_look_back days
+            start_date = current_date - relativedelta(months=months_lookback)
 
-            end_date = current_date
-            report_type = "GET_LEDGER_DETAIL_VIEW_DATA"
-            report_types = [report_type]
-            processing_status = self.config.get("processing_status")
-            # Get list of valid marketplaces
+        end_date = current_date
+        report_type = "GET_LEDGER_DETAIL_VIEW_DATA"
+        report_types = [report_type]
+        processing_status = self.config.get("processing_status")
+        # Get list of valid marketplaces
 
-            marketplace_id = None
-            if context is not None:
-                marketplace_id = context.get("marketplace_id")
+        marketplace_id = None
+        if context is not None:
+            marketplace_id = context.get("marketplace_id")
 
-            report = self.get_sp_reports(marketplace_id=marketplace_id)
-            start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
-            end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
-            items = self.get_reports_list(
-                report, report_types, processing_status, start_date_f, end_date_f
+        report = self.get_sp_reports(marketplace_id=marketplace_id)
+        start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
+        end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
+        items = self.get_reports_list(
+            report, report_types, processing_status, start_date_f, end_date_f
+        )
+
+        if not items["reports"]:
+            report_options = {"eventType": "Adjustments"}
+            self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}, ReportOptions: {report_options}")
+            reports = self.create_report(
+                start_date_f,
+                report,
+                end_date_f,
+                report_type,
+                reportOptions=report_options,
             )
+            for row in reports:
+                row.update({"report_end_date": end_date.isoformat()})
+                if "Date" in row:
+                    date_object = datetime.strptime(row["Date"], "%m/%d/%Y")
+                    row["Date"] = date_object.date().isoformat()
+                yield row
 
-            if not items["reports"]:
-                report_options = {"eventType": "Adjustments"}
-                self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}, ReportOptions: {report_options}")
-                reports = self.create_report(
-                    start_date_f,
-                    report,
-                    end_date_f,
-                    report_type,
-                    reportOptions=report_options,
-                )
-                for row in reports:
-                    row.update({"report_end_date": end_date.isoformat()})
-                    if "Date" in row:
-                        date_object = datetime.strptime(row["Date"], "%m/%d/%Y")
-                        row["Date"] = date_object.date().isoformat()
-                    yield row
-
-            # If reports are form loop through, download documents and populate the data.txt
-            for row in items["reports"]:
-                reports = self.check_report(row["reportId"], report, "json")
-                for report_row in reports:
-                    if "Date" in report_row:
-                        date_object = datetime.strptime(report_row["Date"], "%m/%d/%Y")
-                        report_row["Date"] = date_object.date().isoformat()
-                    
-                    report_row.update({"report_end_date": end_date.isoformat()})
-                    yield report_row
-
-        except Exception as e:
-            raise InvalidResponse(e)
+        # If reports are form loop through, download documents and populate the data.txt
+        for row in items["reports"]:
+            reports = self.check_report(row["reportId"], report, "json")
+            for report_row in reports:
+                if "Date" in report_row:
+                    date_object = datetime.strptime(report_row["Date"], "%m/%d/%Y")
+                    report_row["Date"] = date_object.date().isoformat()
+                
+                report_row.update({"report_end_date": end_date.isoformat()})
+                yield report_row
 
 
 class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
@@ -1551,70 +1483,66 @@ class FBACustomerShipmentSalesReportStream(AmazonSellerStream):
     )
     # @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        try:
-            start_date = self.get_starting_timestamp(context)
-            if start_date:
-                # Remove timezone info from replication date so we can compare it with other dates.
-                start_date = start_date.replace(tzinfo=None)
-            end_date = None
-            if self.config.get("start_date") and not start_date:
-                start_date = parse(self.config.get("start_date"))
-            # We can only do look back of maximum two years in this report type
-            days_look_back = 545  # Few days less than 18 months
-            current_date = datetime.now()
-            minimum_start_date = current_date - timedelta(days=days_look_back)
-            if start_date < minimum_start_date:
-                # Reset start date to days limit if it is greater than days_look_back days
-                start_date = current_date - timedelta(days=days_look_back)
+        start_date = self.get_starting_timestamp(context)
+        if start_date:
+            # Remove timezone info from replication date so we can compare it with other dates.
+            start_date = start_date.replace(tzinfo=None)
+        end_date = None
+        if self.config.get("start_date") and not start_date:
+            start_date = parse(self.config.get("start_date"))
+        # We can only do look back of maximum two years in this report type
+        days_look_back = 545  # Few days less than 18 months
+        current_date = datetime.now()
+        minimum_start_date = current_date - timedelta(days=days_look_back)
+        if start_date < minimum_start_date:
+            # Reset start date to days limit if it is greater than days_look_back days
+            start_date = current_date - timedelta(days=days_look_back)
 
-            end_date = start_date + timedelta(days=30)
-            end_date = self.correct_end_date(end_date, start_date, current_date)
-            report_type = "GET_FBA_FULFILLMENT_CUSTOMER_SHIPMENT_SALES_DATA"
-            report_types = [report_type]
-            processing_status = self.config.get("processing_status")
-            # Get list of valid marketplaces
+        end_date = start_date + timedelta(days=30)
+        end_date = self.correct_end_date(end_date, start_date, current_date)
+        report_type = "GET_FBA_FULFILLMENT_CUSTOMER_SHIPMENT_SALES_DATA"
+        report_types = [report_type]
+        processing_status = self.config.get("processing_status")
+        # Get list of valid marketplaces
 
-            marketplace_id = None
-            if context is not None:
-                marketplace_id = context.get("marketplace_id")
+        marketplace_id = None
+        if context is not None:
+            marketplace_id = context.get("marketplace_id")
 
-            report = self.get_sp_reports(marketplace_id=marketplace_id)
-            while start_date <= current_date:
-                start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
-                end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
-                items = self.get_reports_list(
-                    report, report_types, processing_status, start_date_f, end_date_f
+        report = self.get_sp_reports(marketplace_id=marketplace_id)
+        while start_date <= current_date:
+            start_date_f = start_date.strftime("%Y-%m-%dT00:00:00")
+            end_date_f = end_date.strftime("%Y-%m-%dT23:59:59")
+            items = self.get_reports_list(
+                report, report_types, processing_status, start_date_f, end_date_f
+            )
+
+            if not items["reports"]:
+                self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}")
+                reports = self.create_report(
+                    start_date_f,
+                    report,
+                    end_date_f,
+                    report_type,
                 )
+                if not reports:
+                    return None
+                for row in reports:
+                    row.update({"report_end_date": end_date.isoformat()})
+                    yield row
 
-                if not items["reports"]:
-                    self.logger.info(f"Creating new report. StartDate:{start_date_f}, EndDate: {end_date_f}, ReportName:{self.name}")
-                    reports = self.create_report(
-                        start_date_f,
-                        report,
-                        end_date_f,
-                        report_type,
-                    )
-                    if not reports:
-                        return None
-                    for row in reports:
-                        row.update({"report_end_date": end_date.isoformat()})
-                        yield row
-
-                # If reports are form loop through, download documents and populate the data.txt
-                for row in items["reports"]:
-                    reports = self.check_report(row["reportId"], report, "json")
-                    for report_row in reports:
-                        report_row.update({"report_end_date": end_date.isoformat()})
-                        yield report_row
-                # Move to the next time period
-                start_date = end_date + timedelta(days=1)
-                end_date += timedelta(days=30)
-                end_date = self.correct_end_date(end_date, start_date, current_date)
-                # According to Amazon, spamming bad is, wait for it, good you should - Yoda's lesson of the day!
-                time.sleep(60)
-
-        except Exception as e:
-            raise InvalidResponse(e)
+            # If reports are form loop through, download documents and populate the data.txt
+            for row in items["reports"]:
+                reports = self.check_report(row["reportId"], report, "json")
+                for report_row in reports:
+                    report_row.update({"report_end_date": end_date.isoformat()})
+                    yield report_row
+            # Move to the next time period
+            start_date = end_date + timedelta(days=1)
+            end_date += timedelta(days=30)
+            end_date = self.correct_end_date(end_date, start_date, current_date)
+            # According to Amazon, spamming bad is, wait for it, good you should - Yoda's lesson of the day!
+            time.sleep(60)
 
 class ProductDetailsV2Stream(AmazonSellerStream):
     """Define custom stream."""
@@ -1666,6 +1594,4 @@ class ProductDetailsV2Stream(AmazonSellerStream):
             #     return []
         except SellingApiNotFoundException as e:
             self.logger.warn(e)
-            return []      
-        except Exception as e:
-            raise InvalidResponse(e)        
+            return []
