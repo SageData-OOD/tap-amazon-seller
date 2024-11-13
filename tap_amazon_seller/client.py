@@ -67,8 +67,7 @@ def get_state_if_exists(
         "orderfinancialevents",
     ]
     stream_state = tap_state["bookmarks"][tap_stream_id]
-    if tap_stream_id in skip_incremental_partitions and "partitions" in stream_state:
-        # stream_state["partitions"] = []
+    if tap_stream_id in skip_incremental_partitions and "partitions" in stream_state and len(stream_state["partitions"]) != 0:
         partitions = stream_state["partitions"][len(stream_state["partitions"]) - 1][
             "context"
         ]
