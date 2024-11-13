@@ -1,5 +1,6 @@
 """Amazon-Seller tap class."""
-
+import os
+os.environ["ENV_DISABLE_DONATION_MSG"] = "1"
 from typing import List
 
 from singer_sdk import Stream, Tap
