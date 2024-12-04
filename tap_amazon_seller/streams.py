@@ -8,11 +8,12 @@ from sp_api.util import load_all_pages
 
 from tap_amazon_seller.client import AmazonSellerStream
 from tap_amazon_seller.utils import InvalidResponse, timeout
-from sp_api.base.exceptions import SellingApiServerException,SellingApiNotFoundException
+from sp_api.base.exceptions import SellingApiServerException,SellingApiNotFoundException, SellingApiBadRequestException
 from dateutil.relativedelta import relativedelta
 from sp_api.base import Marketplaces
 from dateutil.parser import parse
 import time
+import urllib.parse
 
 class MarketplacesStream(AmazonSellerStream):
     """Define custom stream."""
@@ -179,6 +180,7 @@ class OrdersStream(AmazonSellerStream):
         ),
     ).to_dict()
 
+    @load_all_pages()
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -186,13 +188,27 @@ class OrdersStream(AmazonSellerStream):
         factor=3,
     )
     @timeout(15)
-    @load_all_pages()
     def load_all_orders(self, mp, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
         """
         orders = self.get_sp_orders(mp)
-        orders_obj = orders.get_orders(**kwargs)
+        try:
+            orders_obj = orders.get_orders(**kwargs)
+            self.backoff_retries = 0
+        except SellingApiBadRequestException as e:
+            if self.backoff_retries >= 3:
+                self.logger.warning(
+                    f"Giving up on stream {self.name} after {self.backoff_retries} attempts. Ending gracefully."
+                )
+                self.backoff_retries = 0
+                return type(
+                    "Page", (), {"payload": {"Orders": []}, "next_token": None}
+                )()
+            else:
+                self.backoff_retries += 1
+                self.logger.info(f"Kwargs in latest request: {kwargs}")
+                raise e
         return orders_obj
 
     def load_order_page(self, mp, **kwargs):
@@ -678,6 +694,7 @@ class WarehouseInventory(AmazonSellerStream):
     ).to_dict()
 
     
+    @load_all_pages()
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -685,7 +702,6 @@ class WarehouseInventory(AmazonSellerStream):
         factor=3,
     )
     @timeout(15)
-    @load_all_pages()
     def load_all_items(self, mp, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
@@ -696,7 +712,27 @@ class WarehouseInventory(AmazonSellerStream):
         if self.next_token is not None:
             kwargs.update({"nextToken": self.next_token})
 
-        list = wi.get_inventory_summary_marketplace(**kwargs)
+        try:
+            list = wi.get_inventory_summary_marketplace(**kwargs)
+            self.backoff_retries = 0
+        except SellingApiBadRequestException as e:
+            if self.backoff_retries >= 3:
+                self.logger.warning(
+                    f"Giving up on stream {self.name} after {self.backoff_retries} attempts. Ending gracefully."
+                )
+                self.backoff_retries = 0
+                return type(
+                    "Page", (), {"payload": {}, "next_token": None}
+                )()
+            else:
+                self.backoff_retries += 1
+                # decode token
+                self.logger.info(f"Kwargs in latest request: {kwargs}")
+                if kwargs.get("NextToken"):
+                    kwargs["NextToken"] = urllib.parse.quote(kwargs["NextToken"])
+                if kwargs.get("nextToken"):
+                    kwargs["nextToken"] = urllib.parse.quote(kwargs["nextToken"])
+                raise e
         return list
 
     def load_item_page(self, mp, **kwargs):
@@ -932,6 +968,7 @@ class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
         ),
     ).to_dict()
 
+    @load_all_pages()
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -939,7 +976,6 @@ class VendorFulfilmentPurchaseOrdersStream(AmazonSellerStream):
         factor=3,
     )
     @timeout(15)
-    @load_all_pages()
     def load_all_orders(self, mp, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
@@ -1011,6 +1047,7 @@ class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
         th.Property("labelData", th.CustomType({"type": ["array", "string"]})),
     ).to_dict()
 
+    @load_all_pages()
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -1018,7 +1055,6 @@ class VendorFulfilmentCustomerInvoicesStream(AmazonSellerStream):
         factor=3,
     )
     @timeout(15)
-    @load_all_pages()
     def load_all_orders(self, mp, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
@@ -1090,6 +1126,7 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
         th.Property("items", th.CustomType({"type": ["array", "string"]})),
     ).to_dict()
 
+    @load_all_pages()
     @backoff.on_exception(
         backoff.expo,
         (Exception),
@@ -1097,7 +1134,6 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
         factor=3,
     )
     @timeout(15)
-    @load_all_pages()
     def load_all_orders(self, mp, **kwargs):
         """
         a generator function to return all pages, obtained by NextToken
