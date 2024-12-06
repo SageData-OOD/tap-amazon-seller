@@ -270,7 +270,7 @@ class OrderItemsStream(AmazonSellerStream):
     """Define custom stream."""
 
     name = "orderitems"
-    primary_keys = ["OrderItemId"]
+    primary_keys = ["AmazonOrderId"]
     replication_key = None
     order_id = "{AmazonOrderId}"
     parent_stream_type = OrdersStream
@@ -1296,7 +1296,7 @@ class SalesTrafficReportStream(AmazonSellerStream):
     """Define custom stream."""
 
     name = "sales_traffic_report"
-    primary_keys = None
+    primary_keys = ["reportId"]
     replication_key = "report_end_date"
     report_id = None
     document_id = None
