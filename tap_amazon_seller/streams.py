@@ -826,11 +826,13 @@ class ProductsIventoryStream(AmazonSellerStream):
             The updated record dictionary, or ``None`` to skip the record.
         """
         if row is not None:
+            processed_row = {}
             for k in row:
+                new_k = k
                 if "-" in k:
-                    row[k.replace("-", "_")] = row[k]
-
-        return row
+                    new_k = k.replace("-", "_")
+                processed_row[new_k] = row[k]
+            return processed_row
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
@@ -839,7 +841,7 @@ class ProductsIventoryStream(AmazonSellerStream):
                 "ASIN": record["asin1"],
                 "marketplace_id": context.get("marketplace_id"),
             }
-        elif "product-id" in record:
+        elif "product_id" in record:
             return {
                 "ASIN": record["product-id"],
                 "marketplace_id": context.get("marketplace_id"),
@@ -891,7 +893,10 @@ class ProductsIventoryStream(AmazonSellerStream):
                 start_date, report, end_date, "GET_MERCHANT_LISTINGS_ALL_DATA"
             )
             for row in reports:
-                yield row
+                transformed_record = self.post_process(row)
+                if transformed_record is None:
+                    continue
+                yield transformed_record
 
         # If reports are form loop through, download documents and populate the data.txt
         for row in items["reports"]:
@@ -901,7 +906,10 @@ class ProductsIventoryStream(AmazonSellerStream):
                     report_row.update(
                         {marketplace_id: context.get("marketplace_id")}
                     )
-                yield report_row
+                transformed_record = self.post_process(report_row)
+                if transformed_record is None:
+                    continue
+                yield transformed_record
 
 
 class ProductDetails(AmazonSellerStream):
