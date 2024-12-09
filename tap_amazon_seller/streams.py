@@ -774,46 +774,63 @@ class ProductsIventoryStream(AmazonSellerStream):
     """Define custom stream."""
 
     name = "products_inventory"
-    primary_keys = ["listing-id"]
+    primary_keys = ["listing_id"]
     replication_key = None
     report_id = None
     document_id = None
     parent_stream_type = MarketplacesStream
     schema = th.PropertiesList(
         th.Property("marketplaceIds", th.CustomType({"type": ["array", "string"]})),
-        th.Property("item-name", th.StringType),
+        th.Property("item_name", th.StringType),
         th.Property("marketplace_id", th.StringType),
-        th.Property("item-description", th.StringType),
-        th.Property("listing-id", th.StringType),
-        th.Property("seller-sku", th.StringType),
+        th.Property("item_description", th.StringType),
+        th.Property("listing_id", th.StringType),
+        th.Property("seller_sku", th.StringType),
         th.Property("price", th.StringType),
         th.Property("quantity", th.StringType),
-        th.Property("open-date", th.StringType),
-        th.Property("image-url", th.StringType),
-        th.Property("item-is-marketplace", th.StringType),
-        th.Property("product-id-type", th.StringType),
-        th.Property("zshop-shipping-fee", th.StringType),
-        th.Property("item-note", th.StringType),
-        th.Property("item-condition", th.StringType),
-        th.Property("zshop-category1", th.StringType),
-        th.Property("zshop-browse-path", th.StringType),
+        th.Property("open_date", th.StringType),
+        th.Property("image_url", th.StringType),
+        th.Property("item_is_marketplace", th.StringType),
+        th.Property("product_id_type", th.StringType),
+        th.Property("zshop_shipping_fee", th.StringType),
+        th.Property("item_note", th.StringType),
+        th.Property("item_condition", th.StringType),
+        th.Property("zshop_category1", th.StringType),
+        th.Property("zshop_browse_path", th.StringType),
         th.Property("asin1", th.StringType),
         th.Property("asin2", th.StringType),
         th.Property("asin3", th.StringType),
-        th.Property("will-ship-internationally", th.StringType),
-        th.Property("zshop-boldface", th.StringType),
-        th.Property("product-id", th.StringType),
-        th.Property("bid-for-featured-placement", th.StringType),
-        th.Property("add-delete", th.StringType),
-        th.Property("pending-quantity", th.StringType),
-        th.Property("fulfilment-channel", th.StringType),
-        th.Property("merchant-shipping-group", th.StringType),
+        th.Property("will_ship_internationally", th.StringType),
+        th.Property("zshop_boldface", th.StringType),
+        th.Property("product_id", th.StringType),
+        th.Property("bid_for_featured_placement", th.StringType),
+        th.Property("add_delete", th.StringType),
+        th.Property("pending_quantity", th.StringType),
+        th.Property("fulfilment_channel", th.StringType),
+        th.Property("merchant_shipping_group", th.StringType),
         th.Property("status", th.StringType),
         th.Property("Minimum order quantity", th.StringType),
         th.Property("Sell remainder", th.StringType),
-        th.Property("product-id", th.StringType),
+        th.Property("product_id", th.StringType),
         th.Property("marketplace_id", th.StringType),
     ).to_dict()
+
+    def post_process(self, row, context = None):
+        """As needed, append or transform raw data to match expected structure.
+
+        Args:
+            row: An individual record from the stream.
+            context: The stream context.
+
+        Returns:
+            The updated record dictionary, or ``None`` to skip the record.
+        """
+        if row is not None:
+            for k in row:
+                if "-" in k:
+                    row[k.replace("-", "_")] = row[k]
+
+        return row
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
