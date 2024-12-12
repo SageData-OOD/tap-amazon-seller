@@ -376,6 +376,7 @@ class OrderItemsStream(AmazonSellerStream):
         # self.state_partitioning_keys = context
         self.state_partitioning_keys = self.partitions[len(self.partitions) - 1]
         # self.state_partitioning_keys = self.partitions
+        self.logger.info(f"Requesting orderitems for order with AmazonOrderId {order_id}")
         sandbox = self.config.get("sandbox", False)
         if sandbox is False:
             items = orders.get_order_items(order_id=order_id).payload
@@ -414,6 +415,7 @@ class OrderBuyerInfo(AmazonSellerStream):
         order_id = context.get("AmazonOrderId", [])
 
         orders = self.get_sp_orders(context.get("marketplace_id"))
+        self.logger.info(f"Requesting orderbuyerinfo for order with AmazonOrderId {order_id}")
         items = orders.get_order_buyer_info(order_id=order_id).payload
         return [items]
 
@@ -460,6 +462,7 @@ class OrderAddress(AmazonSellerStream):
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
         order_id = context.get("AmazonOrderId", [])
 
+        self.logger.info(f"Requesting orderaddress for order with AmazonOrderId {order_id}")
         orders = self.get_sp_orders(context.get("marketplace_id"))
         items = orders.get_order_address(order_id=order_id).payload
         return [items]
@@ -574,6 +577,7 @@ class OrderFinancialEvents(AmazonSellerStream):
 
         finance = self.get_sp_finance(context.get("marketplace_id"))
 
+        self.logger.info(f"Requesting orderfinancialevents for order with AmazonOrderId {order_id}")
         sandbox = self.config.get("sandbox", False)
         if sandbox is False:
             # self.state_partitioning_keys = self.partitions
@@ -942,6 +946,7 @@ class ProductDetails(AmazonSellerStream):
         # if context is not None:
         asin = context.get("ASIN")
         catalog = self.get_sp_catalog(context.get("marketplace_id"))
+        self.logger.info(f"Requesting product_details with asin {asin}")
         if context.get("marketplace_id") == "JP":
             items = catalog.list_items(JAN=asin).payload
         elif context.get("marketplace_id") in ["FR"]:
@@ -1171,7 +1176,7 @@ class VendorPurchaseOrdersStream(AmazonSellerStream):
         """
         a generator function to return all pages, obtained by NextToken
         """
-
+        self.logger.info(f"Requesting vendor_purchase_orders with kwargs: {kwargs} in marketplace: {mp}")
         for page in self.load_all_orders(mp, **kwargs):
             orders = []
             for order in page.payload.get("Orders"):
@@ -1644,6 +1649,7 @@ class ProductDetailsV2Stream(AmazonSellerStream):
                     product_include_data = product_include_data.split(",")
                 
             
+            self.logger.info(f"Making request to product_catalog_details with asin {asin}, includedData {product_include_data}")
             items = catalog.get_catalog_item(asin=asin,includedData=product_include_data).payload
             if "Items" in items:
                 if len(items["Items"]) > 0:
