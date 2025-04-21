@@ -1662,3 +1662,60 @@ class ProductDetailsV2Stream(AmazonSellerStream):
         except SellingApiNotFoundException as e:
             self.logger.warn(e)
             return []
+
+class AWDInventoryStream(AmazonSellerStream):
+    """AWD (Amazon Warehousing and Distribution) Inventory stream."""
+    # Note: AWD is only available for the US marketplace
+    name = "awd_inventory"
+    primary_keys = ["sku"]
+    replication_key = None
+
+    schema = th.PropertiesList(
+        th.Property("sku", th.StringType),
+        th.Property("totalInboundQuantity", th.IntegerType),
+        th.Property("totalOnhandQuantity", th.IntegerType),
+        th.Property("inventoryDetails", 
+            th.ObjectType(
+                th.Property("replenishmentQuantity", th.IntegerType),
+                th.Property("availableDistributableQuantity", th.IntegerType),
+                th.Property("reservedDistributableQuantity", th.IntegerType),
+            )
+        ),
+    ).to_dict()
+
+    @backoff.on_exception(
+        backoff.expo,
+        (Exception),
+        max_tries=10,
+        factor=3,
+    )
+    @timeout(15)
+    def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        """Get AWD inventory records.
+
+        Args:
+            context: Stream partition or context dictionary.
+
+        Yields:
+            AWD inventory records.
+        """
+        awd = self.get_sp_awd()
+    
+
+        response = awd.list_inventory(details="SHOW")
+        inventory_items = response.payload.get("inventory")
+
+        # Handle pagination if there are more results
+        while True:
+            for item in inventory_items:
+                yield item
+
+            next_token = response.next_token
+            if not next_token:
+                break
+
+            response = awd.list_inventory(details="SHOW", nextToken=next_token)
+            inventory_items = response.payload.get("inventory", [])
+
+
+
