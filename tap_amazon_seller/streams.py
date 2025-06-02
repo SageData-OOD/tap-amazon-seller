@@ -840,18 +840,30 @@ class ProductsIventoryStream(AmazonSellerStream):
 
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
-        if "asin1" in record:
+        if "asin1" in record or (record.get("product_id_type") and record.get("product_id_type") in ["1", "ASIN"]):
             return {
-                "ASIN": record["asin1"],
+                "ASIN": record.get("asin1", record.get("product_id")),
                 "marketplace_id": context.get("marketplace_id"),
             }
-        elif "product_id" in record:
+        elif "product_id" in record and record.get("product_id_type") not in ["1", "ASIN"]:
             return {
-                "ASIN": record["product-id"],
+                "product-id": record["product_id"],
                 "marketplace_id": context.get("marketplace_id"),
+                "product-id-type": self.get_product_type(record.get("product_id_type")),
             }
         else:
             return []
+        
+    def get_product_type(self, product_type: dict) -> str:
+        types = {
+            "1": "ASIN",
+            "2": "SellerSKU",
+            "3": "UPC",
+            "4": "EAN",
+            "5": "ISBN",
+            "6": "JAN",
+        }
+        return types.get(product_type, product_type)
 
     @backoff.on_exception(
         backoff.expo,
@@ -1639,6 +1651,7 @@ class ProductDetailsV2Stream(AmazonSellerStream):
         try:
             # if context is not None:
             asin = context.get("ASIN")
+            product_id = context.get("product-id")
             catalog = self.get_sp_catalog_item(context.get("marketplace_id"))
             # Requesting relationships along with this data results in an error. 
             # requesting summaries nullifies other requests and only summaries are part of the response
@@ -1649,8 +1662,13 @@ class ProductDetailsV2Stream(AmazonSellerStream):
                     product_include_data = product_include_data.split(",")
                 
             
-            self.logger.info(f"Making request to product_catalog_details with asin {asin}, includedData {product_include_data}")
-            items = catalog.get_catalog_item(asin=asin,includedData=product_include_data).payload
+            if asin:
+                self.logger.info(f"Making request to product_catalog_details with asin {asin}, includedData {product_include_data}")
+                items = catalog.get_catalog_item(asin=asin,includedData=product_include_data).payload
+            elif product_id:
+                self.logger.info(f"Making request to product_catalog_details with product_id {product_id}, product_id_type {context.get('product-id-type')}, includedData {product_include_data}")
+                items = catalog.get_catalog_item(identifiers=product_id, identifiersType=context.get("product-id-type"),includedData=product_include_data, version="2022-04-01").payload
+
             if "Items" in items:
                 if len(items["Items"]) > 0:
                     items = items["Items"][0]

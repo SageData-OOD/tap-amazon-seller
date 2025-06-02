@@ -26,6 +26,7 @@ import backoff
 from tap_amazon_seller.reportsv3 import ReportsV3
 import singer
 from singer import StateMessage
+from tap_amazon_seller.amz_objects import CatalogItems_v2
 
 ROOT_DIR = os.environ.get("ROOT_DIR", ".")
 
@@ -420,7 +421,7 @@ class AmazonSellerStream(Stream):
     def get_sp_catalog_item(self, marketplace_id=None):
         if marketplace_id is None:
             marketplace_id = self.config.get("marketplace", "US")
-        return CatalogItems(
+        return CatalogItems_v2(
             credentials=self.get_credentials(), marketplace=Marketplaces[marketplace_id]
         )    
 
