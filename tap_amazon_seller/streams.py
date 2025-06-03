@@ -289,7 +289,9 @@ class OrderItemsStream(AmazonSellerStream):
                     th.Property("QuantityOrdered", th.NumberType),
                     th.Property("QuantityShipped", th.NumberType),
                     th.Property(
-                        "ProductInfo", th.CustomType({"type": ["object", "string"]})
+                        "ProductInfo", th.ObjectType(
+                            th.Property("NumberOfItems", th.StringType)
+                        )
                     ),
                     th.Property(
                         "PointsGranted", th.CustomType({"type": ["object", "string"]})
@@ -370,6 +372,7 @@ class OrderItemsStream(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
+        self.logger.info("Fetching order items...")
         order_id = context.get("AmazonOrderId", [])
 
         orders = self.get_sp_orders(context.get("marketplace_id"))
