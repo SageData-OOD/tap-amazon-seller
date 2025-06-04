@@ -385,6 +385,12 @@ class OrderItemsStream(AmazonSellerStream):
             items = orders.get_order_items(order_id=order_id).payload
         else:
             items = orders.get_order_items("'TEST_CASE_200'").payload
+        
+        # Ensure OrderItems is a list, not a string
+        if isinstance(items.get("OrderItems"), str):
+            import json
+            items["OrderItems"] = json.loads(items["OrderItems"])
+        
         return [items]
 
 
