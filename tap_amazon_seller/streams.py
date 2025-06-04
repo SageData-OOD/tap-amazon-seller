@@ -370,7 +370,7 @@ class OrderItemsStream(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        self.logger.info("Fetching order items...")
+        self.logger.info("Fetching order items.")
         order_id = context.get("AmazonOrderId", [])
 
         orders = self.get_sp_orders(context.get("marketplace_id"))
@@ -381,17 +381,26 @@ class OrderItemsStream(AmazonSellerStream):
             items = orders.get_order_items(order_id=order_id).payload
         else:
             items = orders.get_order_items("'TEST_CASE_200'").payload
+
+        self.logger.info(f"Fetched {len(items['OrderItems'])} items for order {order_id}")
+
         return [self.post_process(items)]
 
     def post_process(self, record: dict) -> dict:
         """Process the record to flatten ItemPrice fields."""
         if not record or "OrderItems" not in record:
+            self.logger.warning(f"No OrderItems found for order {record.get('AmazonOrderId', 'Unknown')}")
             return record
 
         for item in record["OrderItems"]:
+            #log whole item details
+            self.logger.info(f"Full item data: {item}")
+
             if "ItemPrice" in item and isinstance(item["ItemPrice"], dict):
+                self.logger.info(f"Processing ItemPrice: {item['ItemPrice']}")
                 item["ItemPriceCurrencyCode"] = item["ItemPrice"].get("CurrencyCode")
                 item["ItemPriceAmount"] = item["ItemPrice"].get("Amount")
+                self.logger.info(f"Flattened ItemPrice - Currency: {item['ItemPriceCurrencyCode']}, Amount: {item['ItemPriceAmount']}")
                 del item["ItemPrice"]
 
         return record
