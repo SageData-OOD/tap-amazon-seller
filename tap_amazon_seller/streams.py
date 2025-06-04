@@ -294,9 +294,9 @@ class OrderItemsStream(AmazonSellerStream):
                     th.Property(
                         "PointsGranted", th.CustomType({"type": ["object", "string"]})
                     ),
-                    th.Property(
-                        "ItemPrice", th.CustomType({"type": ["object", "string"]})
-                    ),
+                    # Replace the ItemPrice with flattened fields
+                    th.Property("ItemPriceCurrencyCode", th.StringType),
+                    th.Property("ItemPriceAmount", th.StringType),
                     th.Property(
                         "ShippingPrice", th.CustomType({"type": ["object", "string"]})
                     ),
@@ -374,16 +374,27 @@ class OrderItemsStream(AmazonSellerStream):
         order_id = context.get("AmazonOrderId", [])
 
         orders = self.get_sp_orders(context.get("marketplace_id"))
-        # self.state_partitioning_keys = context
         self.state_partitioning_keys = self.partitions[len(self.partitions) - 1]
-        # self.state_partitioning_keys = self.partitions
         self.logger.info(f"Requesting orderitems for order with AmazonOrderId {order_id}")
         sandbox = self.config.get("sandbox", False)
         if sandbox is False:
             items = orders.get_order_items(order_id=order_id).payload
         else:
             items = orders.get_order_items("'TEST_CASE_200'").payload
-        return [items]
+        return [self.post_process(items)]
+
+    def post_process(self, record: dict) -> dict:
+        """Process the record to flatten ItemPrice fields."""
+        if not record or "OrderItems" not in record:
+            return record
+
+        for item in record["OrderItems"]:
+            if "ItemPrice" in item and isinstance(item["ItemPrice"], dict):
+                item["ItemPriceCurrencyCode"] = item["ItemPrice"].get("CurrencyCode")
+                item["ItemPriceAmount"] = item["ItemPrice"].get("Amount")
+                del item["ItemPrice"]
+
+        return record
 
 
 class OrderBuyerInfo(AmazonSellerStream):
