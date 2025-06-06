@@ -288,59 +288,52 @@ class OrderItemsStream(AmazonSellerStream):
                     th.Property("Title", th.StringType),
                     th.Property("QuantityOrdered", th.NumberType),
                     th.Property("QuantityShipped", th.NumberType),
-                    th.Property(
-                        "ProductInfo", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    th.Property(
-                        "PointsGranted", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    # Replace the ItemPrice with flattened fields
+                    th.Property("ProductInfoNumberOfItems", th.StringType),
+                    # Points Granted fields
+                    th.Property("PointsGrantedNumber", th.StringType),
+                    th.Property("PointsGrantedMonetaryValueCurrencyCode", th.StringType),
+                    th.Property("PointsGrantedMonetaryValueAmount", th.StringType),
+                    # Item Price fields
                     th.Property("ItemPriceCurrencyCode", th.StringType),
                     th.Property("ItemPriceAmount", th.StringType),
-                    th.Property(
-                        "ShippingPrice", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    th.Property(
-                        "ShippingDiscount",
-                        th.CustomType({"type": ["object", "string"]}),
-                    ),
-                    th.Property(
-                        "ShippingDiscountTax",
-                        th.CustomType({"type": ["object", "string"]}),
-                    ),
-                    th.Property(
-                        "PromotionDiscount",
-                        th.CustomType({"type": ["object", "string"]}),
-                    ),
-                    th.Property(
-                        "PromotionDiscountTax",
-                        th.CustomType({"type": ["object", "string"]}),
-                    ),
-                    th.Property(
-                        "ItemTax", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    th.Property(
-                        "ShippingTax", th.CustomType({"type": ["object", "string"]})
-                    ),
+                    # Shipping Price fields
+                    th.Property("ShippingPriceCurrencyCode", th.StringType),
+                    th.Property("ShippingPriceAmount", th.StringType),
+                    # Shipping Discount fields
+                    th.Property("ShippingDiscountCurrencyCode", th.StringType),
+                    th.Property("ShippingDiscountAmount", th.StringType),
+                    # Shipping Discount Tax fields
+                    th.Property("ShippingDiscountTaxCurrencyCode", th.StringType),
+                    th.Property("ShippingDiscountTaxAmount", th.StringType),
+                    # Promotion Discount fields
+                    th.Property("PromotionDiscountCurrencyCode", th.StringType),
+                    th.Property("PromotionDiscountAmount", th.StringType),
+                    th.Property("PromotionDiscountTaxCurrencyCode", th.StringType),
+                    th.Property("PromotionDiscountTaxAmount", th.StringType),
+                    # Item Tax fields
+                    th.Property("ItemTaxCurrencyCode", th.StringType),
+                    th.Property("ItemTaxAmount", th.StringType),
+                    # Shipping Tax fields
+                    th.Property("ShippingTaxCurrencyCode", th.StringType),
+                    th.Property("ShippingTaxAmount", th.StringType),
+                    # COD Fee fields
+                    th.Property("CODFeeCurrencyCode", th.StringType),
+                    th.Property("CODFeeAmount", th.StringType),
+                    # COD Fee Discount fields
+                    th.Property("CODFeeDiscountCurrencyCode", th.StringType),
+                    th.Property("CODFeeDiscountAmount", th.StringType),
+                    # Tax Collection fields
+                    th.Property("TaxCollectionModel", th.StringType),
+                    th.Property("TaxCollectionResponsibleParty", th.StringType),
+                    # Buyer Tax Info fields
+                    th.Property("BuyerCompanyLegalName", th.StringType),
+                    th.Property("BuyerTaxAuthority", th.StringType),
+                    th.Property("BuyerTaxRegistrationId", th.StringType),
+                    th.Property("BuyerTaxRegistrationType", th.StringType),
                     th.Property(
                         "PromotionIds", th.CustomType({"type": ["array", "string"]})
                     ),
-                    th.Property(
-                        "CODFee", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    th.Property(
-                        "CODFeeDiscount", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    th.Property(
-                        "TaxCollection", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    th.Property(
-                        "BuyerInfo", th.CustomType({"type": ["object", "string"]})
-                    ),
-                    th.Property(
-                        "BuyerRequestedCancel",
-                        th.CustomType({"type": ["object", "string"]}),
-                    ),
+                    th.Property("BuyerRequestedCancel", th.BooleanType),
                     th.Property("IsGift", th.StringType),
                     th.Property("ConditionId", th.StringType),
                     th.Property("ConditionNote", th.StringType),
@@ -353,10 +346,6 @@ class OrderItemsStream(AmazonSellerStream):
                     th.Property("IossNumber", th.StringType),
                     th.Property("DeemedResellerCategory", th.StringType),
                     th.Property("StoreChainStoreId", th.StringType),
-                    th.Property(
-                        "BuyerRequestedCancel",
-                        th.CustomType({"type": ["object", "string"]}),
-                    ),
                 )
             ),
         ),
@@ -370,7 +359,6 @@ class OrderItemsStream(AmazonSellerStream):
     )
     @timeout(15)
     def get_records(self, context: Optional[dict]) -> Iterable[dict]:
-        self.logger.info("Fetching order items.")
         order_id = context.get("AmazonOrderId", [])
 
         orders = self.get_sp_orders(context.get("marketplace_id"))
@@ -387,21 +375,107 @@ class OrderItemsStream(AmazonSellerStream):
         return [self.post_process(items)]
 
     def post_process(self, record: dict) -> dict:
-        """Process the record to flatten ItemPrice fields."""
+        """Process the record to flatten all price, tax, and points related fields."""
         if not record or "OrderItems" not in record:
             self.logger.warning(f"No OrderItems found for order {record.get('AmazonOrderId', 'Unknown')}")
             return record
 
         for item in record["OrderItems"]:
-            #log whole item details
-            self.logger.info(f"Full item data: {item}")
+            # Handle PromotionIds flattening
+            if "PromotionIds" in item and isinstance(item["PromotionIds"], list):
+                item["PromotionIds"] = ",".join(str(pid) for pid in item["PromotionIds"])
 
+            # Handle BuyerRequestedCancel flattening
+            if "BuyerRequestedCancel" in item and isinstance(item["BuyerRequestedCancel"], dict):
+                # The BuyerRequestedCancel field is typically a boolean indicating if the buyer requested cancellation
+                item["BuyerRequestedCancel"] = bool(item["BuyerRequestedCancel"].get("IsBuyerRequestedCancel", False))
+
+            # Handle PointsGranted flattening
+            if "PointsGranted" in item and isinstance(item["PointsGranted"], dict):
+                item["PointsGrantedNumber"] = item["PointsGranted"].get("PointsNumber")
+                if "PointsMonetaryValue" in item["PointsGranted"] and isinstance(item["PointsGranted"]["PointsMonetaryValue"], dict):
+                    item["PointsGrantedMonetaryValueCurrencyCode"] = item["PointsGranted"]["PointsMonetaryValue"].get("CurrencyCode")
+                    item["PointsGrantedMonetaryValueAmount"] = item["PointsGranted"]["PointsMonetaryValue"].get("Amount")
+                del item["PointsGranted"]
+
+            # Handle ItemPrice flattening
             if "ItemPrice" in item and isinstance(item["ItemPrice"], dict):
-                self.logger.info(f"Processing ItemPrice: {item['ItemPrice']}")
                 item["ItemPriceCurrencyCode"] = item["ItemPrice"].get("CurrencyCode")
                 item["ItemPriceAmount"] = item["ItemPrice"].get("Amount")
-                self.logger.info(f"Flattened ItemPrice - Currency: {item['ItemPriceCurrencyCode']}, Amount: {item['ItemPriceAmount']}")
                 del item["ItemPrice"]
+
+            # Handle ProductInfo flattening
+            if "ProductInfo" in item and isinstance(item["ProductInfo"], dict):
+                item["ProductInfoNumberOfItems"] = item["ProductInfo"].get("NumberOfItems")
+                del item["ProductInfo"]
+
+            # Handle ItemTax flattening
+            if "ItemTax" in item and isinstance(item["ItemTax"], dict):
+                item["ItemTaxCurrencyCode"] = item["ItemTax"].get("CurrencyCode")
+                item["ItemTaxAmount"] = item["ItemTax"].get("Amount")
+                del item["ItemTax"]
+
+            # Handle ShippingPrice flattening
+            if "ShippingPrice" in item and isinstance(item["ShippingPrice"], dict):
+                item["ShippingPriceCurrencyCode"] = item["ShippingPrice"].get("CurrencyCode")
+                item["ShippingPriceAmount"] = item["ShippingPrice"].get("Amount")
+                del item["ShippingPrice"]
+
+            # Handle ShippingDiscount flattening
+            if "ShippingDiscount" in item and isinstance(item["ShippingDiscount"], dict):
+                item["ShippingDiscountCurrencyCode"] = item["ShippingDiscount"].get("CurrencyCode")
+                item["ShippingDiscountAmount"] = item["ShippingDiscount"].get("Amount")
+                del item["ShippingDiscount"]
+
+            # Handle ShippingDiscountTax flattening
+            if "ShippingDiscountTax" in item and isinstance(item["ShippingDiscountTax"], dict):
+                item["ShippingDiscountTaxCurrencyCode"] = item["ShippingDiscountTax"].get("CurrencyCode")
+                item["ShippingDiscountTaxAmount"] = item["ShippingDiscountTax"].get("Amount")
+                del item["ShippingDiscountTax"]
+
+            # Handle PromotionDiscount flattening
+            if "PromotionDiscount" in item and isinstance(item["PromotionDiscount"], dict):
+                item["PromotionDiscountCurrencyCode"] = item["PromotionDiscount"].get("CurrencyCode")
+                item["PromotionDiscountAmount"] = item["PromotionDiscount"].get("Amount")
+                del item["PromotionDiscount"]
+
+            # Handle PromotionDiscountTax flattening
+            if "PromotionDiscountTax" in item and isinstance(item["PromotionDiscountTax"], dict):
+                item["PromotionDiscountTaxCurrencyCode"] = item["PromotionDiscountTax"].get("CurrencyCode")
+                item["PromotionDiscountTaxAmount"] = item["PromotionDiscountTax"].get("Amount")
+                del item["PromotionDiscountTax"]
+
+            # Handle ShippingTax flattening
+            if "ShippingTax" in item and isinstance(item["ShippingTax"], dict):
+                item["ShippingTaxCurrencyCode"] = item["ShippingTax"].get("CurrencyCode")
+                item["ShippingTaxAmount"] = item["ShippingTax"].get("Amount")
+                del item["ShippingTax"]
+
+            # Handle CODFee flattening
+            if "CODFee" in item and isinstance(item["CODFee"], dict):
+                item["CODFeeCurrencyCode"] = item["CODFee"].get("CurrencyCode")
+                item["CODFeeAmount"] = item["CODFee"].get("Amount")
+                del item["CODFee"]
+
+            # Handle CODFeeDiscount flattening
+            if "CODFeeDiscount" in item and isinstance(item["CODFeeDiscount"], dict):
+                item["CODFeeDiscountCurrencyCode"] = item["CODFeeDiscount"].get("CurrencyCode")
+                item["CODFeeDiscountAmount"] = item["CODFeeDiscount"].get("Amount")
+                del item["CODFeeDiscount"]
+
+            # Handle TaxCollection flattening
+            if "TaxCollection" in item and isinstance(item["TaxCollection"], dict):
+                item["TaxCollectionModel"] = item["TaxCollection"].get("Model")
+                item["TaxCollectionResponsibleParty"] = item["TaxCollection"].get("ResponsibleParty")
+                del item["TaxCollection"]
+
+            # Handle BuyerInfo flattening
+            if "BuyerInfo" in item and isinstance(item["BuyerInfo"], dict):
+                item["BuyerCompanyLegalName"] = item["BuyerInfo"].get("CompanyLegalName")
+                item["BuyerTaxAuthority"] = item["BuyerInfo"].get("TaxingAuthority")
+                item["BuyerTaxRegistrationId"] = item["BuyerInfo"].get("TaxRegistrationId")
+                item["BuyerTaxRegistrationType"] = item["BuyerInfo"].get("TaxRegistrationType")
+                del item["BuyerInfo"]
 
         return record
 
